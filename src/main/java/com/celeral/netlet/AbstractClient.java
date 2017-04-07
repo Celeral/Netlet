@@ -44,12 +44,12 @@ public abstract class AbstractClient implements ClientListener
   protected final CircularBuffer<Slice> freeBuffer;
   protected CircularBuffer<Slice> sendBuffer4Offers, sendBuffer4Polls;
   protected final ByteBuffer writeBuffer;
-  protected boolean write = true;
+  protected boolean write;
   protected SelectionKey key;
 
   public boolean isConnected()
   {
-    return key.isValid() && ((SocketChannel)key.channel()).isConnected();
+    return key != null && key.isValid() && ((SocketChannel)key.channel()).isConnected();
   }
 
   public AbstractClient(int writeBufferSize, int sendBufferSize)
@@ -88,6 +88,7 @@ public abstract class AbstractClient implements ClientListener
     }
     sendBuffer4Polls = sendBuffer4Offers = new CircularBuffer<Slice>(sendBufferSize, 10);
     freeBuffer = new CircularBuffer<Slice>(sendBufferSize, 10);
+    this.write = true;
   }
 
   @Override

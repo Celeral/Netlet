@@ -139,9 +139,8 @@ public class AbstractClientTest
 
     SocketAddress address;
     synchronized (si) {
-      if ((address = si.getServerAddress()) == null) {
+      while ((address = si.getServerAddress()) == null) {
         si.wait();
-        address = si.getServerAddress();
       }
     }
 

@@ -467,7 +467,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
               @Override
               public void connected()
               {
-                logger.debug("{}", this);
+                logger.trace("{}", this);
                 key.attach(l);
                 l.connected();
                 key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);

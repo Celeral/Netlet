@@ -149,7 +149,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
         SelectedSelectionKeySet keys = new SelectedSelectionKeySet(1024);
         selectedKeys.set(selector, keys);
         publicSelectedKeys.set(selector, keys);
-        logger.debug("Instrumented an optimized java.util.Set into: {}", selector);
+        logger.trace("Instrumented an optimized java.util.Set into: {}", selector);
       }
     }
     catch (Exception e) {

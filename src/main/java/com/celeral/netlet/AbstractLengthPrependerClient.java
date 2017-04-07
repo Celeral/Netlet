@@ -30,7 +30,7 @@ import com.celeral.netlet.util.VarInt;
  *
  * @since 1.0.0
  */
-public abstract class AbstractLengthPrependerClient extends AbstractClient
+public abstract class AbstractLengthPrependerClient extends AbstractClient implements MessagesProcessor
 {
   protected byte[] buffer;
   protected ByteBuffer byteBuffer;
@@ -110,6 +110,16 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
     return -1;
   }
 
+  @Override
+  public void beginMessages()
+  {
+  }
+
+  @Override
+  public void endMessages()
+  {
+  }
+
   /**
    * Upon reading the data from the socket into the byteBuffer, this method is called.
    * read is pronounced "RED", past tense of "read", and not to be confused with the opposite of the "write" method
@@ -119,7 +129,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
   @Override
   public void read(int len)
   {
-    beginMessage();
+    beginMessages();
     writeOffset += len;
     do {
       while (size == 0) {
@@ -140,7 +150,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
             }
           }
           size = 0;
-          endMessage();
+          endMessages();
           return;
         }
       }
@@ -174,11 +184,11 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
           byteBuffer = ByteBuffer.wrap(buffer);
           byteBuffer.position(writeOffset);
         }
-        endMessage();
+        endMessages();
         return;
       }
       else {       /* need to read more */
-        endMessage();
+        endMessages();
         return;
       }
     }
@@ -247,10 +257,6 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
     return false;
   }
 
-  public void beginMessage()
-  {
-  }
-
   /**
    * Discard remaining data currently in the read buffer.
    *<br><br>
@@ -264,12 +270,6 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
    */
   protected void discardReadBuffer() {
     readOffset = writeOffset - size;
-  }
-
-  public abstract void onMessage(byte[] buffer, int offset, int size);
-
-  public void endMessage()
-  {
   }
 
   @Override
