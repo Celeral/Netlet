@@ -15,6 +15,9 @@
  */
 package com.celeral.netlet;
 
+import com.celeral.netlet.DefaultEventLoop;
+import com.celeral.netlet.AbstractClient;
+import com.celeral.netlet.OptimizedEventLoop;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -139,9 +142,8 @@ public class AbstractClientTest
 
     SocketAddress address;
     synchronized (si) {
-      if ((address = si.getServerAddress()) == null) {
+      while ((address = si.getServerAddress()) == null) {
         si.wait();
-        address = si.getServerAddress();
       }
     }
 

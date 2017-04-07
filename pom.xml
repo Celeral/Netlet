@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-   Copyright (c) 2017 Celeral.
+   Copyright 2017 Celeral <netlet@celeral.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -37,6 +37,11 @@
   <prerequisites>
     <maven>3.0.5</maven>
   </prerequisites>
+
+  <organization>
+    <name>Celeral</name>
+    <url>http://www.celeral.com/product/netlet</url>
+  </organization>
 
   <developers>
     <developer>
@@ -253,7 +258,7 @@
             <dependency>
               <groupId>com.celeral</groupId>
               <artifactId>netlet</artifactId>
-              <version>1.2.0</version>
+              <version>1.2.1</version>
             </dependency>
           </oldVersion>
           <newVersion>
@@ -557,6 +562,11 @@
       <artifactId>commons-math3</artifactId>
       <version>3.5</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.esotericsoftware</groupId>
+      <artifactId>kryo</artifactId>
+      <version>4.0.0</version>
     </dependency>
   </dependencies>
 

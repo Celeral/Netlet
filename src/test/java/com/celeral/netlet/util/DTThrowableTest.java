@@ -17,7 +17,7 @@ package com.celeral.netlet.util;
 
 import org.junit.Test;
 
-import static com.celeral.netlet.util.DTThrowable.rethrow;
+import static com.celeral.netlet.util.DTThrowable.wrapIfChecked;
 
 public class DTThrowableTest
 {
@@ -27,7 +27,7 @@ public class DTThrowableTest
     try {
     }
     catch (Throwable th) {
-      rethrow(th);
+      wrapIfChecked(th);
     }
   }
 
@@ -37,7 +37,7 @@ public class DTThrowableTest
     try {
     }
     catch (Exception th) {
-      rethrow(th);
+      wrapIfChecked(th);
     }
   }
 
@@ -48,7 +48,7 @@ public class DTThrowableTest
     try {
     }
     catch (Error th) {
-      rethrow(th);
+      wrapIfChecked(th);
     }
   }
 
@@ -59,7 +59,7 @@ public class DTThrowableTest
     try {
     }
     catch (RuntimeException th) {
-      rethrow(th);
+      wrapIfChecked(th);
     }
   }
 
