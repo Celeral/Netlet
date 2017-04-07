@@ -283,7 +283,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
         }
       }
       else {
-        DTThrowable.rethrow(cce);
+        DTThrowable.wrapIfChecked(cce);
       }
     }
     else {

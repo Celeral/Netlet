@@ -16,12 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.netlet.codec;
+package com.celeral.netlet.codec;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import com.celeral.netlet.util.DTThrowable;
+import com.celeral.netlet.util.Slice;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Registration;
 import com.esotericsoftware.kryo.io.Input;
@@ -31,10 +34,6 @@ import com.esotericsoftware.kryo.util.MapReferenceResolver;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.datatorrent.netlet.util.DTThrowable;
-import com.datatorrent.netlet.util.Slice;
-import java.lang.reflect.Method;
 
 /**
  * Default implementation of the StreamCodec.

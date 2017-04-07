@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Chetan Narsude  <chetan@apache.org>.
+ * Copyright 2017 Celeral <netlet@celeral.com>.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datatorrent.netlet.rpc;
+package com.celeral.netlet.rpc;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
+import com.celeral.netlet.AbstractServer;
+import com.celeral.netlet.DefaultEventLoop;
+import com.celeral.netlet.rpc.ProxyClient.ExecutingClient;
+
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.datatorrent.netlet.AbstractServer;
-import com.datatorrent.netlet.DefaultEventLoop;
-import com.datatorrent.netlet.rpc.ProxyClient.ExecutingClient;
-import java.net.SocketAddress;
-import java.nio.channels.SelectionKey;
-import org.junit.Assert;
 
 /**
  *
