@@ -15,6 +15,8 @@
  */
 package com.celeral.netlet;
 
+import com.celeral.netlet.AbstractClient;
+import com.celeral.netlet.AbstractServer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;

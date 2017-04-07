@@ -25,18 +25,6 @@ package com.celeral.netlet.util;
  */
 public class DTThrowable
 {
-  @SuppressWarnings("ThrowableResultIgnored")
-  public static void rethrow(Throwable cause)
-  {
-    wrapIfChecked(cause);
-  }
-
-  @SuppressWarnings("ThrowableResultIgnored")
-  public static void rethrow(Exception exception)
-  {
-    wrapIfChecked(exception);
-  }
-
   public static RuntimeException wrapIfChecked(Throwable cause)
   {
     if (cause instanceof Error) {
@@ -79,28 +67,6 @@ public class DTThrowable
    */
   @Deprecated
   public static RuntimeException wrapIfChecked(RuntimeException exception)
-  {
-    throw exception;
-  }
-
-  /**
-   *
-   * @param error
-   * @deprecated Instead "DTThrowable.rethrow(error);" use "throw error;" directly.
-   */
-  @Deprecated
-  public static void rethrow(Error error)
-  {
-    throw error;
-  }
-
-  /**
-   *
-   * @param exception
-   * @deprecated Instead "DTThrowable.rethrow(runtime_exception);" use "throw runtime_exception;" directly.
-   */
-  @Deprecated
-  public static void rethrow(RuntimeException exception)
   {
     throw exception;
   }

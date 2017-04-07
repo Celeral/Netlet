@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Chetan Narsude  <chetan@apache.org>.
+ * Copyright 2017 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datatorrent.netlet.rpc;
+package com.celeral.netlet.rpc;
 
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,10 +21,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.datatorrent.netlet.AbstractLengthPrependerClient;
-import com.datatorrent.netlet.codec.DefaultStatefulStreamCodec;
-import com.datatorrent.netlet.codec.StatefulStreamCodec.DataStatePair;
-import com.datatorrent.netlet.util.Slice;
+import com.celeral.netlet.AbstractLengthPrependerClient;
+import com.celeral.netlet.codec.DefaultStatefulStreamCodec;
+import com.celeral.netlet.codec.StatefulStreamCodec.DataStatePair;
+import com.celeral.netlet.util.Slice;
 import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 

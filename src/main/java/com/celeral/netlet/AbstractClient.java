@@ -158,7 +158,7 @@ public abstract class AbstractClient implements ClientListener
   /**
    * @since 1.2.0
    */
-  public boolean resumeReadIfSuspended()
+  public boolean resumeRead()
   {
     final int interestOps = key.interestOps();
     if ((interestOps & SelectionKey.OP_READ) == 0) {
@@ -169,25 +169,6 @@ public abstract class AbstractClient implements ClientListener
     } else {
       return false;
     }
-  }
-
-  /**
-   * @deprecated As of release 1.2.0, replaced by {@link #suspendReadIfResumed()}
-   */
-  @Deprecated
-  public void suspendRead()
-  {
-    key.interestOps(key.interestOps() & ~SelectionKey.OP_READ);
-  }
-
-  /**
-   * @deprecated As of release 1.2.0, replaced by {@link #resumeReadIfSuspended()}
-   */
-  @Deprecated
-  public void resumeRead()
-  {
-    key.interestOps(key.interestOps() | SelectionKey.OP_READ);
-    key.selector().wakeup();
   }
 
   @Override

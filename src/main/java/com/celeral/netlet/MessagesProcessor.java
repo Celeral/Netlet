@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Chetan Narsude  <chetan@apache.org>.
+ * Copyright 2017 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.datatorrent.netlet.util;
-
-import java.util.Collection;
+package com.celeral.netlet;
 
 /**
  *
  * @author Chetan Narsude  <chetan@apache.org>
  */
-public class ElasticBuffer<T>
+public interface MessagesProcessor extends MessageProcessor
 {
-  protected transient Collection<T> writeBuffer;
-  protected transient Collection<T> readBuffer;
-
+  void beginMessages();
+  void endMessages();
 }

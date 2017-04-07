@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Chetan Narsude  <chetan@apache.org>.
+ * Copyright 2017 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datatorrent.netlet.rpc;
+package com.celeral.netlet.rpc;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -28,10 +28,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.datatorrent.netlet.EventLoop;
-import com.datatorrent.netlet.rpc.Client.ExtendedRPC;
-import com.datatorrent.netlet.rpc.Client.RPC;
-import com.datatorrent.netlet.rpc.Client.RR;
+import com.celeral.netlet.EventLoop;
+import com.celeral.netlet.rpc.Client.ExtendedRPC;
+import com.celeral.netlet.rpc.Client.RPC;
+import com.celeral.netlet.rpc.Client.RR;
 import java.lang.reflect.InvocationTargetException;
 
 /**

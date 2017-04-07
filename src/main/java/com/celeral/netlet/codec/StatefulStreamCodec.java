@@ -16,13 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-package com.datatorrent.netlet.codec;
 
-import com.datatorrent.netlet.util.Slice;
+package com.celeral.netlet.codec;
+
+import com.celeral.netlet.util.Slice;
 
 /**
  * <p>StatefulStreamCodec interface.</p>
