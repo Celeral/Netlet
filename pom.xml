@@ -558,6 +558,11 @@
       <version>3.5</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.esotericsoftware</groupId>
+      <artifactId>kryo</artifactId>
+      <version>4.0.0</version>
+    </dependency>
   </dependencies>
 
   <distributionManagement>
