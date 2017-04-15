@@ -1,4 +1,9 @@
 # Change Log
+## [1.2.1](https://github.com/DataTorrent/Netlet/tree/v1.2.1) (2017-04-14)
+[Full Changelog](https://github.com/DataTorrent/Netlet/compare/v1.2.0...v1.2.1)
+
+- This version number purposely violates semantic versioning rules
+- It's a symbolic release to just change the package and the copyright.
 
 ## [1.2.0](https://github.com/DataTorrent/Netlet/tree/v1.2.0) (2015-09-15)
 [Full Changelog](https://github.com/DataTorrent/Netlet/compare/v1.1.0...v1.2.0)
