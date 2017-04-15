@@ -50,17 +50,19 @@ public class OptimizedEventLoop extends DefaultEventLoop
     {
       while (defaultEventLoop.alive && pos > 0) {
         final SelectionKey sk = keys[--pos];
-      keys[pos] = null;
+        keys[pos] = null;
         if (!sk.isValid()) {
           continue;
         }
         try {
           defaultEventLoop.handleSelectedKey(sk);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
           Listener l = (Listener)sk.attachment();
           if (l != null) {
             l.handleException(ex, defaultEventLoop);
-          } else {
+          }
+          else {
             logger.warn("Exception on unattached SelectionKey {} ", sk, ex);
           }
         }
@@ -75,9 +77,9 @@ public class OptimizedEventLoop extends DefaultEventLoop
       }
       keys[pos++] = key;
       if (pos == keys.length) {
-        SelectionKey[] keys = new SelectionKey[this.keys.length << 1];
-        System.arraycopy(this.keys, 0, keys, 0, pos);
-        this.keys = keys;
+        SelectionKey[] lKeys = new SelectionKey[this.keys.length << 1];
+        System.arraycopy(this.keys, 0, lKeys, 0, pos);
+        this.keys = lKeys;
       }
       return true;
     }
@@ -88,12 +90,15 @@ public class OptimizedEventLoop extends DefaultEventLoop
       return pos;
     }
 
-    public boolean remove(Object o) {
+    @Override
+    public boolean remove(Object o)
+    {
       return false;
     }
 
     @Override
-    public boolean contains(Object o) {
+    public boolean contains(Object o)
+    {
       if (o == null) {
         return false;
       }
@@ -107,12 +112,14 @@ public class OptimizedEventLoop extends DefaultEventLoop
     }
 
     @Override
-    public Iterator<SelectionKey> iterator() {
+    public Iterator<SelectionKey> iterator()
+    {
       throw new UnsupportedOperationException();
     }
+
   }
 
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings({"deprecation", "UseSpecificCatch"})
   public OptimizedEventLoop(String id) throws IOException
   {
     super(id);
@@ -120,7 +127,8 @@ public class OptimizedEventLoop extends DefaultEventLoop
       ClassLoader systemClassLoader;
       if (System.getSecurityManager() == null) {
         systemClassLoader = ClassLoader.getSystemClassLoader();
-      } else {
+      }
+      else {
         systemClassLoader = AccessController.doPrivileged(new PrivilegedAction<ClassLoader>()
         {
           @Override
@@ -128,6 +136,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
           {
             return ClassLoader.getSystemClassLoader();
           }
+
         });
       }
 
@@ -140,7 +149,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
         SelectedSelectionKeySet keys = new SelectedSelectionKeySet(1024);
         selectedKeys.set(selector, keys);
         publicSelectedKeys.set(selector, keys);
-        logger.debug("Instrumented an optimized java.util.Set into: {}", selector);
+        logger.trace("Instrumented an optimized java.util.Set into: {}", selector);
       }
     }
     catch (Exception e) {
@@ -149,19 +158,22 @@ public class OptimizedEventLoop extends DefaultEventLoop
   }
 
   @SuppressWarnings({"SleepWhileInLoop", "ConstantConditions"})
+  @Override
   protected void runEventLoop()
   {
     Set<SelectionKey> selectedKeys = selector.selectedKeys();
     if (selectedKeys instanceof SelectedSelectionKeySet) {
-      runEventLoop((SelectedSelectionKeySet) selectedKeys);
-    } else
+      runEventLoop((SelectedSelectionKeySet)selectedKeys);
+    }
+    else {
       super.runEventLoop();
+    }
   }
 
   private void runEventLoop(SelectedSelectionKeySet keys)
   {
     while (alive) {
-          int size = tasks.size();
+      int size = tasks.size();
       try {
         if (size > 0) {
           while (alive && size > 0) {
@@ -178,15 +190,17 @@ public class OptimizedEventLoop extends DefaultEventLoop
           if (selector.selectNow() == 0) {
             continue;
           }
-        } else if (selector.select() == 0) {
-              continue;
-            }
-      } catch (IOException e) {
+        }
+        else if (selector.select() == 0) {
+          continue;
+        }
+      }
+      catch (IOException e) {
         logger.error("Unexpected exception in selector {}", selector, e);
         throw new RuntimeException(e);
-          }
+      }
       keys.forEach(this);
-        }
+    }
     //logger.debug("Terminated {}", this);
   }
 

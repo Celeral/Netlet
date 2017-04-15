@@ -1,4 +1,4 @@
-/*
+        /*
  * Copyright (c) 2013 DataTorrent, Inc. ALL Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -138,8 +138,8 @@ public class CircularBufferTest
 
     instance.add(10);
 
-    assert (instance.size() == 9);
-    assert (instance.remove() == 2);
+    assert (9 == instance.size());
+    assert (2 == instance.remove());
     Thread.currentThread().setName(oldName);
   }
 

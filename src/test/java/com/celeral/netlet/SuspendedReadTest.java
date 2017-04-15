@@ -15,6 +15,9 @@
  */
 package com.celeral.netlet;
 
+import com.celeral.netlet.DefaultEventLoop;
+import com.celeral.netlet.AbstractClient;
+import com.celeral.netlet.AbstractServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -88,7 +91,7 @@ public class SuspendedReadTest
     Client client = new Client();
     DefaultEventLoop eventLoop = DefaultEventLoop.createEventLoop("test");
     eventLoop.start();
-    eventLoop.start("localhost", 5035, server);
+    eventLoop.start(new InetSocketAddress("localhost", 5035), server);
     eventLoop.connect(new InetSocketAddress("localhost", 5035), client);
     byte[] data = new byte[1024];
     int i = 0;
