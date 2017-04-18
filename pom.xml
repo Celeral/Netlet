@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-   Copyright (c) 2015 DataTorrent, Inc. ALL Rights Reserved.
+   Copyright 2017 Celeral <netlet@celeral.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,14 +18,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.datatorrent</groupId>
+  <groupId>com.celeral</groupId>
   <artifactId>netlet</artifactId>
-  <version>1.2.1-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Netlet</name>
   <description>A networking library to facilitate a no-nonsense fast tcp nio</description>
-  <url>http://www.datatorrent.com/product/netlet</url>
+  <url>http://www.celeral.com/product/netlet</url>
 
   <licenses>
     <license>
@@ -38,12 +38,17 @@
     <maven>3.0.5</maven>
   </prerequisites>
 
+  <organization>
+    <name>Celeral</name>
+    <url>http://www.celeral.com/product/netlet</url>
+  </organization>
+
   <developers>
     <developer>
       <id>243826</id>
       <name>Chetan Narsude</name>
-      <email>chetan@datatorrent.com</email>
-      <organization>DataTorrent, Inc.</organization>
+      <email>chetan@apache.org</email>
+      <organization>Celeral</organization>
       <roles>
         <role>architect</role>
         <role>developer</role>
@@ -61,9 +66,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:git@github.com:DataTorrent/Netlet.git</connection>
-    <developerConnection>scm:git:git@github.com:DataTorrent/Netlet.git</developerConnection>
-    <url>git@github.com:DataTorrent/Netlet.git</url>
+    <connection>scm:git:git@github.com:Celeral/Netlet.git</connection>
+    <developerConnection>scm:git:git@github.com:Celeral/Netlet.git</developerConnection>
+    <url>git@github.com:Celeral/Netlet.git</url>
   </scm>
 
   <properties>
@@ -162,9 +167,9 @@
         <configuration>
           <oldVersion>
             <dependency>
-              <groupId>com.datatorrent</groupId>
+              <groupId>com.celeral</groupId>
               <artifactId>netlet</artifactId>
-              <version>1.2.0</version>
+              <version>1.2.1</version>
             </dependency>
           </oldVersion>
           <newVersion>
@@ -187,8 +192,8 @@
               <exclude>package.Class#fieldToExclude</exclude>
             </excludes -->
             <accessModifier>protected</accessModifier>
-            <breakBuildOnModifications>true</breakBuildOnModifications>
-            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+            <breakBuildOnModifications>false</breakBuildOnModifications>
+            <breakBuildOnBinaryIncompatibleModifications>false</breakBuildOnBinaryIncompatibleModifications>
             <onlyBinaryIncompatible>false</onlyBinaryIncompatible>
             <includeSynthetic>false</includeSynthetic>
             <ignoreMissingClasses>false</ignoreMissingClasses>
@@ -228,7 +233,7 @@
             <id>checkstyle</id>
             <configuration>
               <configLocation>netlet_checks.xml</configLocation>
-              <maxAllowedViolations>254</maxAllowedViolations>
+              <maxAllowedViolations>25554</maxAllowedViolations>
               <failOnViolation>true</failOnViolation>
               <includeTestSourceDirectory>true</includeTestSourceDirectory>
               <logViolationsToConsole>${checkstyle.console}</logViolationsToConsole>
@@ -251,9 +256,9 @@
         <configuration>
           <oldVersion>
             <dependency>
-              <groupId>com.datatorrent</groupId>
+              <groupId>com.celeral</groupId>
               <artifactId>netlet</artifactId>
-              <version>1.2.0</version>
+              <version>1.2.1</version>
             </dependency>
           </oldVersion>
           <newVersion>
@@ -378,9 +383,9 @@
                 <argument>-XX:MaxNewSize=768m</argument>
                 <argument>-cp</argument>
                 <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
-                <argument>com.datatorrent.netlet.benchmark.netlet.EchoTcpServer</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.count=${benchmark.count}</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>com.celeral.netlet.benchmark.netlet.EchoTcpServer</argument>
                 <argument>${benchmark.port}</argument>
               </arguments>
               <classpathScope>test</classpathScope>
@@ -421,9 +426,9 @@
                 <argument>-XX:MaxNewSize=768m</argument>
                 <argument>-cp</argument>
                 <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
-                <argument>com.datatorrent.netlet.benchmark.netty.EchoTcpServer</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.count=${benchmark.count}</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>com.celeral.netlet.benchmark.netty.EchoTcpServer</argument>
                 <argument>${benchmark.port}</argument>
               </arguments>
               <classpathScope>test</classpathScope>
@@ -464,9 +469,9 @@
                 <argument>-XX:MaxNewSize=512m</argument>
                 <argument>-cp</argument>
                 <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
-                <argument>com.datatorrent.netlet.benchmark.netlet.BenchmarkTcpClient</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.count=${benchmark.count}</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>com.celeral.netlet.benchmark.netlet.BenchmarkTcpClient</argument>
                 <argument>${benchmark.host}</argument>
                 <argument>${benchmark.port}</argument>
               </arguments>
@@ -508,9 +513,9 @@
                 <argument>-XX:MaxNewSize=512m</argument>
                 <argument>-cp</argument>
                 <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
-                <argument>com.datatorrent.netlet.benchmark.netty.BenchmarkTcpClient</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.count=${benchmark.count}</argument>
+                <argument>-Dcom.celeral.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>com.celeral.netlet.benchmark.netty.BenchmarkTcpClient</argument>
                 <argument>${benchmark.host}</argument>
                 <argument>${benchmark.port}</argument>
               </arguments>
@@ -557,6 +562,11 @@
       <artifactId>commons-math3</artifactId>
       <version>3.5</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.esotericsoftware</groupId>
+      <artifactId>kryo</artifactId>
+      <version>4.0.0</version>
     </dependency>
   </dependencies>
 

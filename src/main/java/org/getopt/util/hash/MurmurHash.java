@@ -24,8 +24,8 @@ package org.getopt.util.hash;
  * <p>The C version of MurmurHash 2.0 found at that site was ported
  * to Java by Andrzej Bialecki (ab at getopt org).</p>
  *
- * <p>Customized for DataTorrent's use for hash of byte array slice by
- * Chetan Narsude (chetan at datatorrent com).</p>
+ * <p>Customized for Celeral's use for hash of byte array slice by
+ * Chetan Narsude (chetan at apache org).</p>
  *
  * @since 1.0.0
  */

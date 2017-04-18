@@ -24,7 +24,7 @@ netlet is available in the Maven Central Repository:
 
 ```
   <dependency>
-    <groupId>com.datatorrent</groupId>
+    <groupId>com.celeral</groupId>
     <artifactId>netlet</artifactId>
     <version>1.2.0</version>
   </dependency>
@@ -96,11 +96,11 @@ mvn exec:exec -Dbenchmark=netty.client
 
 ##Downloads##
 
-You can download the latest version from the [release page](https://github.com/DataTorrent/Netlet/releases) or directly from the [maven central repository](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22netlet%22).
+You can download the latest version from the [release page](https://github.com/Celeral/Netlet/releases) or directly from the [maven central repository](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22netlet%22).
 
 ##Development##
 
-* ![Build Status](https://travis-ci.org/DataTorrent/Netlet.svg?branch=master)
+* ![Build Status](https://travis-ci.org/Celeral/Netlet.svg?branch=master)
 
 ###Reports###
 
