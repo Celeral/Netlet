@@ -1,4 +1,4 @@
-/*
+  /*
  * Copyright 2017 Celeral <netlet@celeral.com>.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +25,7 @@ import java.nio.channels.SocketChannel;
 import com.celeral.netlet.AbstractServer;
 import com.celeral.netlet.DefaultEventLoop;
 import com.celeral.netlet.rpc.ProxyClient.ExecutingClient;
+import java.util.concurrent.Executors;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -51,7 +52,7 @@ public class RPCTest
     @Override
     public void greet()
     {
-      logger.debug("Hello World!");
+      logger.debug("greet = Hello World!");
       greeted = true;
       throw new RuntimeException("Hello World!");
     }
@@ -59,6 +60,7 @@ public class RPCTest
     @Override
     public boolean hasGreeted()
     {
+      logger.debug("greeted = {}", greeted);
       return greeted;
     }
 
@@ -67,10 +69,18 @@ public class RPCTest
 
   public static class Server extends AbstractServer
   {
+    private final boolean multithreaded;
+    public Server(boolean multithreaded)
+    {
+      this.multithreaded = multithreaded;
+    }
+
     @Override
     public ClientListener getClientConnection(SocketChannel client, ServerSocketChannel server)
     {
-      return new ExecutingClient(new HelloWorldImpl(), new Class<?>[]{HelloWorld.class});
+      return multithreaded
+             ? new ExecutingClient(new HelloWorldImpl(), new Class<?>[] {HelloWorld.class}, Executors.newFixedThreadPool(10))
+             : new ExecutingClient(new HelloWorldImpl(), new Class<?>[] {HelloWorld.class});
     }
 
     @Override
@@ -86,12 +96,23 @@ public class RPCTest
 
 
   @Test
-  public void testRPC() throws IOException, InterruptedException
+  public void testRPCMultiThreaded() throws IOException, InterruptedException
+  {
+    testRPC(true);
+  }
+
+  @Test
+  public void testRPCSingleThreaded() throws IOException, InterruptedException
+  {
+    testRPC(false);
+  }
+
+  public void testRPC(boolean multithreaded) throws IOException, InterruptedException
   {
     DefaultEventLoop el = DefaultEventLoop.createEventLoop("rpc");
     el.start();
     try {
-      Server server = new Server();
+      Server server = new Server(multithreaded);
       el.start(new InetSocketAddress(0), server);
 
       SocketAddress si;
@@ -103,7 +124,7 @@ public class RPCTest
 
       try {
         ProxyClient client = new ProxyClient((InetSocketAddress)si, el);
-        HelloWorld helloWorld = (HelloWorld)client.newProxyInstance(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
+        HelloWorld helloWorld = (HelloWorld)client.create(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
         Assert.assertFalse("Before Greeted!", helloWorld.hasGreeted());
 
         try {

@@ -46,6 +46,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
       keys = new SelectionKey[size];
     }
 
+    @SuppressWarnings("UseSpecificCatch")
     public void forEach(final DefaultEventLoop defaultEventLoop)
     {
       while (defaultEventLoop.alive && pos > 0) {
@@ -119,10 +120,10 @@ public class OptimizedEventLoop extends DefaultEventLoop
 
   }
 
-  @SuppressWarnings({"deprecation", "UseSpecificCatch"})
-  public OptimizedEventLoop(String id) throws IOException
+  @SuppressWarnings({"UseSpecificCatch"})
+  OptimizedEventLoop(String id, int taskBufferSize) throws IOException
   {
-    super(id);
+    super(id, taskBufferSize);
     try {
       ClassLoader systemClassLoader;
       if (System.getSecurityManager() == null) {
@@ -176,17 +177,20 @@ public class OptimizedEventLoop extends DefaultEventLoop
       int size = tasks.size();
       try {
         if (size > 0) {
-          while (alive && size > 0) {
+          do {
             Runnable task = tasks.pollUnsafe();
-            try {
+            if (logger.isDebugEnabled()) {
+              logger.debug("Starting Task {}", task);
+              long nanoTime = System.nanoTime();
+              task.run();
+              logger.debug("Finished Task {} after {}", task, System.nanoTime() - nanoTime);
+            }
+            else {
               task.run();
             }
-            catch (Exception e) {
-              logger.error("Unexpected exception in task {}", task);
-              throw new RuntimeException(e);
-            }
-            size--;
           }
+          while (--size > 0);
+
           if (selector.selectNow() == 0) {
             continue;
           }
@@ -196,7 +200,6 @@ public class OptimizedEventLoop extends DefaultEventLoop
         }
       }
       catch (IOException e) {
-        logger.error("Unexpected exception in selector {}", selector, e);
         throw new RuntimeException(e);
       }
       keys.forEach(this);

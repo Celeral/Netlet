@@ -15,9 +15,6 @@
  */
 package com.celeral.netlet;
 
-import com.celeral.netlet.DefaultEventLoop;
-import com.celeral.netlet.AbstractClient;
-import com.celeral.netlet.AbstractServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -61,7 +58,7 @@ public class SuspendedReadTest
         {
           super.registered(key);
           assertFalse(isReadSuspended());
-          suspendReadIfResumed();
+          suspendRead();
           assertTrue(isReadSuspended());
         }
       };

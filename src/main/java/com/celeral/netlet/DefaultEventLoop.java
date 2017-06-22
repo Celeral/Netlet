@@ -36,17 +36,45 @@ import com.celeral.netlet.util.CircularBuffer;
  */
 public class DefaultEventLoop implements Runnable, EventLoop
 {
-  public static final String eventLoopPropertyName = "com.celeral.netlet.disableOptimizedEventLoop";
+  public static final String EVENTLOOP_IMPL_CLASS = "com.celeral.netlet.EventLoop";
+  public static final String EVENTLOOP_TASK_BACKLOG = "com.celeral.netlet.EventLoop.backlog";
+
+
+  static final int getEventLoopBacklog()
+  {
+    final String stringSize = System.getProperty(EVENTLOOP_TASK_BACKLOG);
+    return stringSize == null? 1024: Integer.parseInt(stringSize);
+  }
+
+  static final Class<? extends EventLoop> getEventLoopImplementation()
+  {
+    final String stringClass = System.getProperty(EVENTLOOP_IMPL_CLASS);
+    if (stringClass == null) {
+      return OptimizedEventLoop.class;
+    }
+
+    try {
+      @SuppressWarnings("unchecked")
+      Class<? extends EventLoop> forName = (Class<? extends EventLoop>)Class.forName(stringClass);
+      return forName;
+    }
+    catch (ClassNotFoundException ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   public static DefaultEventLoop createEventLoop(final String id) throws IOException
   {
-    final String disableOptimizedEventLoop = System.getProperty(eventLoopPropertyName);
-    if (disableOptimizedEventLoop == null || disableOptimizedEventLoop.equalsIgnoreCase("false") || disableOptimizedEventLoop.equalsIgnoreCase("no")) {
-      return new OptimizedEventLoop(id);
-    } else {
-      @SuppressWarnings("deprecation")
-      DefaultEventLoop eventLoop = new DefaultEventLoop(id);
-      return eventLoop;
+    Class<? extends EventLoop> eventLoopImplementation = getEventLoopImplementation();
+    if (eventLoopImplementation.equals(OptimizedEventLoop.class)) {
+      return new OptimizedEventLoop(id, getEventLoopBacklog());
     }
+
+    if (eventLoopImplementation.equals(DefaultEventLoop.class)) {
+      return new DefaultEventLoop(id, getEventLoopBacklog());
+    }
+
+    throw new IllegalArgumentException("Only " + DefaultEventLoop.class + " and " + OptimizedEventLoop.class + " are supported as valid values for system property " + EVENTLOOP_IMPL_CLASS );
   }
 
   public final String id;
@@ -61,10 +89,9 @@ public class DefaultEventLoop implements Runnable, EventLoop
    * @param id of the event loop
    * @throws IOException
    */
-  @Deprecated
-  public DefaultEventLoop(String id) throws IOException
+  DefaultEventLoop(String id, int taskBufferSize) throws IOException
   {
-    this.tasks = new CircularBuffer<Runnable>(1024, 5);
+    this.tasks = new CircularBuffer<Runnable>(taskBufferSize, 5);
     this.id = id;
     selector = Selector.open();
   }
@@ -77,28 +104,27 @@ public class DefaultEventLoop implements Runnable, EventLoop
     return eventThread;
   }
 
-  public void stop()
+  public synchronized void stop()
   {
-    submit(new Runnable()
-    {
-      @Override
-      public void run()
+    if (--refCount == 0) {
+      submit(new Runnable()
       {
-        synchronized (DefaultEventLoop.this) {
-          if (--refCount == 0) {
+        @Override
+        public void run()
+        {
+          synchronized (DefaultEventLoop.this) {
             alive = false;
-            selector.wakeup();
           }
         }
-      }
 
-      @Override
-      public String toString()
-      {
-        return String.format("stop{%d}", refCount);
-      }
+        @Override
+        public String toString()
+        {
+          return String.format("stop{%d}", refCount);
+        }
 
-    });
+      });
+    }
   }
 
   @Override
@@ -108,7 +134,8 @@ public class DefaultEventLoop implements Runnable, EventLoop
       if (eventThread == null) {
         refCount++;
         eventThread = Thread.currentThread();
-      } else if (eventThread != Thread.currentThread()) {
+      }
+      else if (eventThread != Thread.currentThread()) {
         throw new IllegalStateException("DefaultEventLoop can not run in two [" + eventThread.getName() + "] and ["
                 + Thread.currentThread().getName() + "] threads.");
       }
@@ -246,7 +273,16 @@ public class DefaultEventLoop implements Runnable, EventLoop
             int size = tasks.size();
             if (size > 0) {
               do {
-                tasks.pollUnsafe().run();
+                Runnable task = tasks.pollUnsafe();
+                if (logger.isDebugEnabled()) {
+                  logger.debug("Starting Task {}", task);
+                  long nanoTime = System.nanoTime();
+                  task.run();
+                  logger.debug("Finished Task {} after {}", task, System.nanoTime() - nanoTime);
+                }
+                else {
+                  task.run();
+                }
               }
               while (--size > 0);
               size = selector.selectNow();
@@ -348,7 +384,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
   public void submit(Runnable r)
   {
     Thread currentThread = Thread.currentThread();
-    //logger.debug("{}.{}.{}", currentThread, r, eventThread);
+    logger.debug("Submitted Task {}.{}.{}", currentThread, r, eventThread);
     if (tasks.isEmpty() && eventThread == currentThread) {
       r.run();
     }
@@ -392,7 +428,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
       @Override
       public void run()
       {
-        for (SelectionKey key : selector.keys()) {
+        for (SelectionKey key: selector.keys()) {
           if (key.channel() == c) {
             ((Listener)key.attachment()).unregistered(key);
             key.interestOps(0);
@@ -445,73 +481,73 @@ public class DefaultEventLoop implements Runnable, EventLoop
              * will return true.
              */
             register(channel, SelectionKey.OP_CONNECT | SelectionKey.OP_READ, new ClientListener()
-            {
-              private SelectionKey key;
+             {
+               private SelectionKey key;
 
-              @Override
-              public void read() throws IOException
-              {
-                logger.debug("missing OP_CONNECT");
-                connected();
-                l.read();
-              }
+               @Override
+               public void read() throws IOException
+               {
+                 logger.debug("missing OP_CONNECT");
+                 connected();
+                 l.read();
+               }
 
-              @Override
-              public void write() throws IOException
-              {
-                logger.debug("missing OP_CONNECT");
-                connected();
-                l.write();
-              }
+               @Override
+               public void write() throws IOException
+               {
+                 logger.debug("missing OP_CONNECT");
+                 connected();
+                 l.write();
+               }
 
-              @Override
-              public void connected()
-              {
-                logger.trace("{}", this);
-                key.attach(l);
-                l.connected();
-                key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-              }
+               @Override
+               public void connected()
+               {
+                 logger.trace("{}", this);
+                 key.attach(l);
+                 l.connected();
+                 key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+               }
 
-              @Override
-              public void disconnected()
-              {
-                /*
+               @Override
+               public void disconnected()
+               {
+                 /*
                  * Expectation is that connected() or read() will be called and this ClientListener will be replaced
                  * by the original ClientListener in the key attachment before disconnect is initiated. In any case
                  * as original Client Listener was never attached to the key, this method will never be called. Please
                  * see DefaultEventLoop.disconnect().
-                 */
-                logger.debug("missing OP_CONNECT {}", this);
-                throw new NotYetConnectedException();
-              }
+                  */
+                 logger.debug("missing OP_CONNECT {}", this);
+                 throw new NotYetConnectedException();
+               }
 
-              @Override
-              public void handleException(Exception exception, EventLoop eventloop)
-              {
-                key.attach(l);
-                l.handleException(exception, eventloop);
-              }
+               @Override
+               public void handleException(Exception exception, EventLoop eventloop)
+               {
+                 key.attach(l);
+                 l.handleException(exception, eventloop);
+               }
 
-              @Override
-              public void registered(SelectionKey key)
-              {
-                l.registered(this.key = key);
-              }
+               @Override
+               public void registered(SelectionKey key)
+               {
+                 l.registered(this.key = key);
+               }
 
-              @Override
-              public void unregistered(SelectionKey key)
-              {
-                l.unregistered(key);
-              }
+               @Override
+               public void unregistered(SelectionKey key)
+               {
+                 l.unregistered(key);
+               }
 
-              @Override
-              public String toString()
-              {
-                return "Pre-connect Client listener for " + l.toString();
-              }
+               @Override
+               public String toString()
+               {
+                 return "Pre-connect Client listener for " + l.toString();
+               }
 
-            });
+             });
           }
         }
         catch (IOException ie) {
@@ -544,7 +580,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
       @Override
       public void run()
       {
-        for (SelectionKey key : selector.keys()) {
+        for (SelectionKey key: selector.keys()) {
           if (key.attachment() == l) {
             try {
               l.unregistered(key);
@@ -627,7 +663,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
       @Override
       public void run()
       {
-        for (SelectionKey key : selector.keys()) {
+        for (SelectionKey key: selector.keys()) {
           if (key.attachment() == l) {
             if (key.isValid()) {
               l.unregistered(key);

@@ -20,7 +20,7 @@ import java.net.InetSocketAddress;
 
 /**
  *
- * @author Chetan Narsude  <chetan@apache.org>
+ * @author Chetan Narsude  {@literal <chetan@apache.org>}
  */
 public class ProtocolSpecificAddress extends InetSocketAddress
 {

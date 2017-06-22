@@ -20,7 +20,7 @@ import java.util.Collection;
 
 /**
  *
- * @author Chetan Narsude  <chetan@apache.org>
+ * @author Chetan Narsude  {@literal <chetan@apache.org>}
  */
 public class ElasticBuffer<T>
 {

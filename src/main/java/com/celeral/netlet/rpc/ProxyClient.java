@@ -37,13 +37,15 @@ import java.lang.reflect.InvocationTargetException;
 /**
  * The class is abstract so that we can resolve the type T at runtime.
  *
- * @author Chetan Narsude  <chetan@apache.org>
+ * @author Chetan Narsude  {@literal <chetan@apache.org>}
  */
 public class ProxyClient implements InvocationHandler
 {
   InetSocketAddress address;
   EventLoop eventLoop;
   DelegatingClient client;
+
+  private long timeoutMillis;
 
   ConcurrentLinkedQueue<RPCFuture> futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
 
@@ -127,13 +129,14 @@ public class ProxyClient implements InvocationHandler
 
   }
 
-  ProxyClient(InetSocketAddress address, EventLoop loop)
+  public ProxyClient(InetSocketAddress address, EventLoop eventloop)
   {
+    this.timeoutMillis = Long.MAX_VALUE;
     this.address = address;
-    eventLoop = loop;
+    this.eventLoop = eventloop;
   }
 
-  public Object newProxyInstance(ClassLoader loader, Class<?>[] interfaces)
+  public Object create(ClassLoader loader, Class<?>[] interfaces)
   {
     // is there a value in making sure that the passed interfaces contain the type T
 //    TypeVariable<? extends Class<?>>[] typeParameters = ProxyClient.class.getTypeParameters();
@@ -159,6 +162,16 @@ public class ProxyClient implements InvocationHandler
     return Proxy.newProxyInstance(loader, interfaces, this);
   }
 
+  public void destroy()
+  {
+    if (client != null) {
+      if (client.isConnected()) {
+        eventLoop.disconnect(client);
+      }
+      client = null;
+    }
+  }
+
   // whenenver method on the proxy instance is called, this method gets called.
   // it's imperial that we are able to serialize all this information and send
   // it over the pipe!
@@ -171,9 +184,23 @@ public class ProxyClient implements InvocationHandler
 
     RPCFuture future = new RPCFuture(client.send(method, args));
     futureResponses.add(future);
-    while (future.isDone() == false) {
-      synchronized (future) {
-        future.wait();
+
+    if (future.isDone() == false) {
+      long diff = timeoutMillis;
+      long waitUntil = System.currentTimeMillis() + diff;
+      do {
+        synchronized (future) {
+          future.wait(diff);
+        }
+
+        if (future.isDone()) {
+          break;
+        }
+      }
+      while ((diff = waitUntil - System.currentTimeMillis()) > 0);
+
+      if (diff <= 0) {
+        throw new TimeoutException("Method " + method.toString() + " timed out!");
       }
     }
 
@@ -251,6 +278,14 @@ public class ProxyClient implements InvocationHandler
       this.methodMap = new HashMap<Integer, Method>();
     }
 
+    public ExecutingClient(Object executor, Class<?>[] interfaces, ExecutorService executors)
+    {
+      super(executors);
+      this.executor = executor;
+      this.interfaces = interfaces;
+      this.methodMap = new HashMap<Integer, Method>();
+    }
+
     @Override
     @SuppressWarnings("UseSpecificCatch")
     public void onMessage(RPC message)
@@ -302,4 +337,20 @@ public class ProxyClient implements InvocationHandler
   }
 
   private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);
+
+  /**
+   * @return the timeoutMillis
+   */
+  public long getTimeoutMillis()
+  {
+    return timeoutMillis;
+  }
+
+  /**
+   * @param timeoutMillis the timeoutMillis to set
+   */
+  public void setTimeoutMillis(long timeoutMillis)
+  {
+    this.timeoutMillis = timeoutMillis;
+  }
 }
