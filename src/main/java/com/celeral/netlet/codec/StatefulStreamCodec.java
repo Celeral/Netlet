@@ -85,16 +85,62 @@ public interface StatefulStreamCodec<T>
    * should not be confused with the resetState operation of upstream operator.
    *
    */
-  public void resetState();
+  void resetState();
 
-  /**
-   * Provide a new instance of the current object.
-   *
-   * As the StatefulStreamCodec builds its state according to the events that it processes since the last
-   * reset state, we cannot share the same codec across multiple streams. For this reason, the engine may
-   * internally need to make multiple copies of the StatefulStreamCodec.
-   *
-   * @return new instance of this codec for which the state has been reset.
-   */
-  public StatefulStreamCodec<T> newInstance();
+
+  static class Synchronized
+  {
+    static class $tatefulStreamCodec<T> implements com.celeral.netlet.codec.StatefulStreamCodec<T>
+    {
+      private final StatefulStreamCodec<T> codec;
+      private final Object mutex;
+      $tatefulStreamCodec(StatefulStreamCodec<T> codec, Object mutex)
+      {
+        this.mutex = mutex;
+        this.codec = codec;
+      }
+
+      $tatefulStreamCodec(StatefulStreamCodec<T> codec)
+      {
+        this.codec = codec;
+        this.mutex = this;
+      }
+
+      @Override
+      public Object fromDataStatePair(DataStatePair dspair)
+      {
+        synchronized (mutex) {
+          return codec.fromDataStatePair(dspair);
+        }
+      }
+
+      @Override
+      public DataStatePair toDataStatePair(T object)
+      {
+        synchronized (mutex) {
+          return codec.toDataStatePair(object);
+        }
+      }
+
+      @Override
+      public void resetState()
+      {
+        synchronized (mutex) {
+          codec.resetState();
+        }
+      }
+
+    }
+
+    public static <T> StatefulStreamCodec<T> wrap(StatefulStreamCodec<T> codec)
+    {
+      return new $tatefulStreamCodec<T>(codec);
+    }
+
+    public static <T> StatefulStreamCodec<T> wrap(StatefulStreamCodec<T> codec, Object mutex)
+    {
+      return new $tatefulStreamCodec<T>(codec, mutex);
+    }
+  }
+
 }

@@ -17,7 +17,7 @@ package com.celeral.netlet;
 
 /**
  *
- * @author Chetan Narsude  <chetan@apache.org>
+ * @author Chetan Narsude  {@literal <chetan@apache.org>}
  */
 public interface MessageProcessor
 {

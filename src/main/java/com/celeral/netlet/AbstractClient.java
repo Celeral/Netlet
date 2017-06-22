@@ -133,6 +133,8 @@ public abstract class AbstractClient implements ClientListener
   }
 
   /**
+   * Check the read interest status on the underlying socket.
+   * @return true if the read is suspended, false otherwise.
    * @since 1.2.0
    */
   public boolean isReadSuspended()
@@ -141,9 +143,11 @@ public abstract class AbstractClient implements ClientListener
   }
 
   /**
+   * Suspend the read operation on the socket if it was not suspended.
+   * @return false if the read was already suspended, true otherwise.
    * @since 1.2.0
    */
-  public boolean suspendReadIfResumed()
+  public boolean suspendRead()
   {
     final int interestOps = key.interestOps();
     if ((interestOps & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
@@ -156,6 +160,8 @@ public abstract class AbstractClient implements ClientListener
   }
 
   /**
+   * Resume the read operation on the socket if it was suspended.
+   * @return false if the read was already resumed, true otherwise.
    * @since 1.2.0
    */
   public boolean resumeRead()

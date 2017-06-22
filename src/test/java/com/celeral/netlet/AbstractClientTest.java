@@ -15,9 +15,6 @@
  */
 package com.celeral.netlet;
 
-import com.celeral.netlet.DefaultEventLoop;
-import com.celeral.netlet.AbstractClient;
-import com.celeral.netlet.OptimizedEventLoop;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -30,17 +27,16 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
-
 import static java.lang.Thread.sleep;
+
+import com.celeral.netlet.ServerTest.ServerImpl;
+import com.celeral.netlet.util.CircularBuffer;
+import com.celeral.netlet.util.Slice;
 
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.celeral.netlet.ServerTest.ServerImpl;
-import com.celeral.netlet.util.CircularBuffer;
-import com.celeral.netlet.util.Slice;
 
 public class AbstractClientTest
 {
@@ -181,13 +177,13 @@ public class AbstractClientTest
   @Test
   public void testWithDefault() throws IOException, InterruptedException
   {
-    verifySendReceive(new DefaultEventLoop("test"));
+    verifySendReceive(new DefaultEventLoop("test", 1024));
   }
 
   @Test
   public void testWithOptimized() throws IOException, InterruptedException
   {
-    verifySendReceive(new OptimizedEventLoop("test"));
+    verifySendReceive(new OptimizedEventLoop("test", 1024));
   }
 
   @Test
@@ -195,16 +191,10 @@ public class AbstractClientTest
   public void testCreateEventLoop() throws IOException
   {
     Assert.assertEquals(OptimizedEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
-    System.setProperty(DefaultEventLoop.eventLoopPropertyName, "");
+    System.setProperty(DefaultEventLoop.EVENTLOOP_IMPL_CLASS, DefaultEventLoop.class.getCanonicalName());
     Assert.assertEquals(DefaultEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
-    System.setProperty(DefaultEventLoop.eventLoopPropertyName, "false");
+    System.setProperty(DefaultEventLoop.EVENTLOOP_IMPL_CLASS, OptimizedEventLoop.class.getCanonicalName());
     Assert.assertEquals(OptimizedEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
-    System.setProperty(DefaultEventLoop.eventLoopPropertyName, "true");
-    Assert.assertEquals(DefaultEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
-    System.setProperty(DefaultEventLoop.eventLoopPropertyName, "no");
-    Assert.assertEquals(OptimizedEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
-    System.setProperty(DefaultEventLoop.eventLoopPropertyName, "yes");
-    Assert.assertEquals(DefaultEventLoop.class, DefaultEventLoop.createEventLoop("test").getClass());
   }
 
   @Test

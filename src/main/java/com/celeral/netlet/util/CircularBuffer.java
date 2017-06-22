@@ -99,7 +99,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   public T remove()
   {
     if (head > tail) {
-      int pos = (int)(tail & buffermask);
+      final int pos = (int)(tail & buffermask);
       T t = buffer[pos];
       buffer[pos] = null;
       tail++;
@@ -181,7 +181,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
       }
 
       Thread.sleep(spinMillis);
-    }
+      }
     while (true);
   }
 
@@ -210,7 +210,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   {
     do {
       if (head > tail) {
-        int pos = (int)(tail & buffermask);
+        final int pos = (int)(tail & buffermask);
         T t = buffer[pos];
         buffer[pos] = null;
         tail++;
@@ -229,7 +229,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
     long millis = unit.toMillis(timeout);
     do {
       if (head > tail) {
-        int pos = (int)(tail & buffermask);
+        final int pos = (int)(tail & buffermask);
         T t = buffer[pos];
         buffer[pos] = null;
         tail++;
@@ -265,9 +265,8 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   public int drainTo(final Collection<? super T> collection, final int maxElements)
   {
     int i = -1;
-    int pos;
     while (++i < maxElements && head > tail) {
-      pos = (int)(tail & buffermask);
+      final int pos = (int)(tail & buffermask);
       collection.add(buffer[pos]);
       buffer[pos] = null;
       tail++;
@@ -280,7 +279,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   public T poll()
   {
     if (head > tail) {
-      int pos = (int)(tail & buffermask);
+      final int pos = (int)(tail & buffermask);
       T t = buffer[pos];
       buffer[pos] = null;
       tail++;
@@ -293,7 +292,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   @Override
   public T pollUnsafe()
   {
-    int pos = (int)(tail & buffermask);
+    final int pos = (int)(tail & buffermask);
     T t = buffer[pos];
     buffer[pos] = null;
     tail++;
@@ -384,7 +383,7 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
       @Override
       public T next()
       {
-        int pos = (int)(tail & buffermask);
+        final int pos = (int)(tail & buffermask);
         T t = buffer[pos];
         buffer[pos] = null;
         tail++;
@@ -404,9 +403,8 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
   {
     final int count = (int)(head - tail);
     Object[] array = new Object[count];
-    int pos;
     for (int i = 0; i < count; i++) {
-      pos = (int)(tail & buffermask);
+      final int pos = (int)(tail & buffermask);
       array[i] = buffer[pos];
       buffer[pos] = null;
       tail++;
@@ -424,9 +422,8 @@ public class CircularBuffer<T> implements UnsafeBlockingQueue<T>
       a = (T[])new Object[count];
     }
 
-    int pos;
     for (int i = 0; i < count; i++) {
-      pos = (int)(tail & buffermask);
+      final int pos = (int)(tail & buffermask);
       a[i] = (T)buffer[pos];
       buffer[pos] = null;
       tail++;
