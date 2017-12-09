@@ -16,33 +16,34 @@
 package com.celeral.netlet.rpc;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.concurrent.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.celeral.netlet.EventLoop;
 import com.celeral.netlet.rpc.Client.ExtendedRPC;
 import com.celeral.netlet.rpc.Client.RPC;
 import com.celeral.netlet.rpc.Client.RR;
-import java.lang.reflect.InvocationTargetException;
 
 /**
  * The class is abstract so that we can resolve the type T at runtime.
  *
- * @author Chetan Narsude  {@literal <chetan@apache.org>}
+ * @author Chetan Narsude {@literal <chetan@apache.org>}
  */
 public class ProxyClient implements InvocationHandler
 {
-  InetSocketAddress address;
-  EventLoop eventLoop;
+  private ConnectionAgent agent;
   DelegatingClient client;
 
   private long timeoutMillis;
@@ -129,11 +130,10 @@ public class ProxyClient implements InvocationHandler
 
   }
 
-  public ProxyClient(InetSocketAddress address, EventLoop eventloop)
+  public ProxyClient(ConnectionAgent agent)
   {
     this.timeoutMillis = Long.MAX_VALUE;
-    this.address = address;
-    this.eventLoop = eventloop;
+    this.agent = agent;
   }
 
   public Object create(ClassLoader loader, Class<?>[] interfaces)
@@ -166,7 +166,7 @@ public class ProxyClient implements InvocationHandler
   {
     if (client != null) {
       if (client.isConnected()) {
-        eventLoop.disconnect(client);
+        agent.disconnect(client);
       }
       client = null;
     }
@@ -179,7 +179,7 @@ public class ProxyClient implements InvocationHandler
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
   {
     if (!client.isConnected()) {
-      eventLoop.connect(address, client);
+      agent.connect(client);
     }
 
     RPCFuture future = new RPCFuture(client.send(method, args));
@@ -261,8 +261,8 @@ public class ProxyClient implements InvocationHandler
       send(rpc);
       return rpc;
     }
-  }
 
+  }
 
   public static class ExecutingClient extends Client<RPC>
   {
@@ -301,7 +301,7 @@ public class ProxyClient implements InvocationHandler
           String methodGenericstring = ((ExtendedRPC)message).methodGenericstring;
 
           for (Class<?> intf : interfaces) {
-            for (Method m: intf.getMethods()) {
+            for (Method m : intf.getMethods()) {
               logger.trace("genericString = {}", m.toGenericString());
               if (methodGenericstring.equals(m.toGenericString())) {
                 methodMap.put(message.methodId, m);
@@ -334,9 +334,8 @@ public class ProxyClient implements InvocationHandler
 
       send(rr);
     }
-  }
 
-  private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);
+  }
 
   /**
    * @return the timeoutMillis
@@ -353,4 +352,22 @@ public class ProxyClient implements InvocationHandler
   {
     this.timeoutMillis = timeoutMillis;
   }
+
+  /**
+   * @return the agent
+   */
+  public ConnectionAgent getConnectionAgent()
+  {
+    return agent;
+  }
+
+  /**
+   * @param agent the agent to set
+   */
+  public void setConnectionAgent(ConnectionAgent agent)
+  {
+    this.agent = agent;
+  }
+
+  private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);
 }
