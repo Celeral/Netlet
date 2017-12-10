@@ -31,8 +31,8 @@ public interface ConnectionAgent
 
   class SimpleConnectionAgent implements ConnectionAgent
   {
-    private final InetSocketAddress address;
-    private final EventLoop eventloop;
+    public final InetSocketAddress address;
+    public final EventLoop eventloop;
     public SimpleConnectionAgent(InetSocketAddress address, EventLoop eventLoop)
     {
       this.address = address;

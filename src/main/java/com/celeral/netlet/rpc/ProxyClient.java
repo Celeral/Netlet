@@ -43,10 +43,9 @@ import com.celeral.netlet.rpc.Client.RR;
  */
 public class ProxyClient implements InvocationHandler
 {
+  private TimeoutPolicy policy;
   private ConnectionAgent agent;
   DelegatingClient client;
-
-  private long timeoutMillis;
 
   ConcurrentLinkedQueue<RPCFuture> futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
 
@@ -55,7 +54,7 @@ public class ProxyClient implements InvocationHandler
    */
   public static class RPCFuture implements Future<Object>
   {
-    RPC rpc;
+    private final RPC rpc;
     AtomicReference<RR> rr;
 
     public RPCFuture(RPC rpc, RR rr)
@@ -102,18 +101,18 @@ public class ProxyClient implements InvocationHandler
     public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
     {
       if (rr.get() == null) {
-        long expiryMillis = System.currentTimeMillis() + unit.toMillis(timeout);
-
-        RPC r = rpc;
+        long diff = unit.toMillis(timeout);
+        long waitUntil = System.currentTimeMillis() + diff;
         do {
-          long waitMillis = expiryMillis - System.currentTimeMillis();
-          if (waitMillis > 0) {
-            synchronized (r) {
-              r.wait(waitMillis);
-            }
+          synchronized (rpc) {
+            rpc.wait(diff);
+          }
+
+          if (rr.get() != null) {
+            break;
           }
         }
-        while (rr.get() == null);
+        while ((diff = waitUntil - System.currentTimeMillis()) > 0);
       }
 
       RR r = rr.get();
@@ -130,9 +129,9 @@ public class ProxyClient implements InvocationHandler
 
   }
 
-  public ProxyClient(ConnectionAgent agent)
+  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy)
   {
-    this.timeoutMillis = Long.MAX_VALUE;
+    this.policy = policy;
     this.agent = agent;
   }
 
@@ -158,7 +157,6 @@ public class ProxyClient implements InvocationHandler
 //      }
 //    }
 
-    client = new DelegatingClient(futureResponses);
     return Proxy.newProxyInstance(loader, interfaces, this);
   }
 
@@ -178,38 +176,29 @@ public class ProxyClient implements InvocationHandler
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
   {
-    if (!client.isConnected()) {
-      agent.connect(client);
-    }
-
-    RPCFuture future = new RPCFuture(client.send(method, args));
-    futureResponses.add(future);
-
-    if (future.isDone() == false) {
-      long diff = timeoutMillis;
-      long waitUntil = System.currentTimeMillis() + diff;
-      do {
-        synchronized (future) {
-          future.wait(diff);
-        }
-
-        if (future.isDone()) {
-          break;
-        }
+    do {
+      if (client == null) {
+        client = new DelegatingClient(futureResponses);
+        agent.connect(client);
       }
-      while ((diff = waitUntil - System.currentTimeMillis()) > 0);
+      else if (!client.isConnected()) {
+        agent.connect(client);
+      }
 
-      if (diff <= 0) {
-        throw new TimeoutException("Method " + method.toString() + " timed out!");
+      RPCFuture future = new RPCFuture(client.send(method, args));
+      futureResponses.add(future);
+
+      try {
+        return future.get(getPolicy().getTimeoutMillis(), TimeUnit.MILLISECONDS);
+      }
+      catch (TimeoutException ex) {
+        getPolicy().handleTimeout(this, ex);
+      }
+      catch (ExecutionException ex) {
+        throw ex.getCause();
       }
     }
-
-    RR rr = future.rr.get();
-    if (rr.exception != null) {
-      throw rr.exception;
-    }
-
-    return rr.response;
+    while (true);
   }
 
   public static class DelegatingClient extends Client<RR>
@@ -234,8 +223,8 @@ public class ProxyClient implements InvocationHandler
         int id = next.rpc.id;
         if (id == rr.id) {
           next.rr.set(rr);
-          synchronized (next) {
-            next.notifyAll();
+          synchronized (next.rpc) {
+            next.rpc.notifyAll();
           }
           iterator.remove();
           break;
@@ -338,22 +327,6 @@ public class ProxyClient implements InvocationHandler
   }
 
   /**
-   * @return the timeoutMillis
-   */
-  public long getTimeoutMillis()
-  {
-    return timeoutMillis;
-  }
-
-  /**
-   * @param timeoutMillis the timeoutMillis to set
-   */
-  public void setTimeoutMillis(long timeoutMillis)
-  {
-    this.timeoutMillis = timeoutMillis;
-  }
-
-  /**
    * @return the agent
    */
   public ConnectionAgent getConnectionAgent()
@@ -366,7 +339,26 @@ public class ProxyClient implements InvocationHandler
    */
   public void setConnectionAgent(ConnectionAgent agent)
   {
+    if (client != null) {
+      destroy();
+    }
     this.agent = agent;
+  }
+
+  /**
+   * @return the policy
+   */
+  public TimeoutPolicy getPolicy()
+  {
+    return policy;
+  }
+
+  /**
+   * @param policy the policy to set
+   */
+  public void setPolicy(TimeoutPolicy policy)
+  {
+    this.policy = policy;
   }
 
   private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);
