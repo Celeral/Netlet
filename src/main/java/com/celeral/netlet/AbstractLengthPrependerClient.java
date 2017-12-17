@@ -22,7 +22,7 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.celeral.netlet.util.DTThrowable;
+import com.celeral.netlet.util.CThrowable;
 import com.celeral.netlet.util.VarInt;
 
 /**
@@ -283,7 +283,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
         }
       }
       else {
-        DTThrowable.wrapIfChecked(cce);
+        CThrowable.wrapIfChecked(cce);
       }
     }
     else {

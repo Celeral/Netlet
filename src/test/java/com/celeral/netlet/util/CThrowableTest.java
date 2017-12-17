@@ -17,9 +17,9 @@ package com.celeral.netlet.util;
 
 import org.junit.Test;
 
-import static com.celeral.netlet.util.DTThrowable.wrapIfChecked;
+import static com.celeral.netlet.util.CThrowable.wrapIfChecked;
 
-public class DTThrowableTest
+public class CThrowableTest
 {
   @Test
   public void testRethrow_Throwable()

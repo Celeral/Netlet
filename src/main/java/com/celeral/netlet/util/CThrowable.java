@@ -23,7 +23,7 @@ package com.celeral.netlet.util;
  *
  * @since 1.0.0
  */
-public class DTThrowable
+public class CThrowable
 {
   public static RuntimeException wrapIfChecked(Throwable cause)
   {
