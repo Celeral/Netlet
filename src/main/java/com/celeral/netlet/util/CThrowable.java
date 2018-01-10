@@ -15,6 +15,10 @@
  */
 package com.celeral.netlet.util;
 
+import java.lang.reflect.Constructor;
+
+import static org.slf4j.helpers.MessageFormatter.arrayFormat;
+
 /**
  * Helper method to ensure that exceptions are propertly thrown.
  * If the cause is of type Error or RuntimeException then the
@@ -69,6 +73,45 @@ public class CThrowable
   public static RuntimeException wrapIfChecked(RuntimeException exception)
   {
     throw exception;
+  }
+
+  @SuppressWarnings("UseSpecificCatch")
+  public static <T extends Throwable> T throwFormatted(Class<T> clazz, String messagePattern, Object... args) throws T
+  {
+    String message = arrayFormat(messagePattern, args).getMessage();
+
+    T instance = null;
+    try {
+      Constructor<T> constructor = clazz.getConstructor(String.class);
+      instance = constructor.newInstance(message);
+    }
+    catch (Exception ex) {
+      throwFormatted(ex, RuntimeException.class,
+                     "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
+                     clazz.getName(), message);
+    }
+
+    throw instance;
+  }
+
+  @SuppressWarnings( {"UseSpecificCatch", "InfiniteRecursion"})
+  public static <T extends Throwable> T throwFormatted(Throwable cause, Class<T> clazz, String messagePattern, Object... args) throws T
+  {
+    String message = arrayFormat(messagePattern, args).getMessage();
+
+    T instance = null;
+    try {
+      Constructor<T> constructor = clazz.getConstructor(String.class, Throwable.class);
+      instance = constructor.newInstance(message, cause);
+    }
+    catch (Exception ex) {
+      // ex.addSuppressed(cause); -- we cannot add this without making this 1.6 incompatible, a deferred decision.
+      throwFormatted(ex, RuntimeException.class,
+                     "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
+                     clazz.getName(), message);
+    }
+
+    throw instance;
   }
 
 }

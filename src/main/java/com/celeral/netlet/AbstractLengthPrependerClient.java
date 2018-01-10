@@ -275,7 +275,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
   @Override
   public void handleException(Exception cce, EventLoop el)
   {
-    if (key.attachment() == this) {
+    if (key != null && key.attachment() == this) {
       if (cce instanceof IOException) {
         logger.debug("Disconnecting {} because of an exception.", this, cce);
         if (isConnected()) {
