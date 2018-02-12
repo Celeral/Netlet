@@ -59,13 +59,9 @@ public class OptimizedEventLoop extends DefaultEventLoop
           defaultEventLoop.handleSelectedKey(sk);
         }
         catch (Exception ex) {
-          Listener l = (Listener)sk.attachment();
-          if (l != null) {
-            l.handleException(ex, defaultEventLoop);
-          }
-          else {
-            logger.warn("Exception on unattached SelectionKey {} ", sk, ex);
-          }
+          Listener l = (Listener) sk.attachment();
+          logger.warn("Exception on SelectionKey {} associated with listener {}", sk, l, ex);
+          l.handleException(ex, defaultEventLoop);
         }
       }
     }

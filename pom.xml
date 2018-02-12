@@ -160,7 +160,7 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
+      <!-- plugin>
         <groupId>com.github.siom79.japicmp</groupId>
         <artifactId>japicmp-maven-plugin</artifactId>
         <version>0.6.2</version>
@@ -179,7 +179,7 @@
           </newVersion>
           <parameter>
             <onlyModified>true</onlyModified>
-            <!-- includes>
+            <includes>
               <include>package.to.include</include>
               <include>package.ClassToInclude</include>
               <include>package.Class#methodToInclude(long,int)</include>
@@ -190,22 +190,22 @@
               <exclude>package.ClassToExclude</exclude>
               <exclude>package.Class#methodToExclude(long,int)</exclude>
               <exclude>package.Class#fieldToExclude</exclude>
-            </excludes -->
+            </excludes>
             <accessModifier>protected</accessModifier>
             <breakBuildOnModifications>false</breakBuildOnModifications>
             <breakBuildOnBinaryIncompatibleModifications>false</breakBuildOnBinaryIncompatibleModifications>
             <onlyBinaryIncompatible>false</onlyBinaryIncompatible>
             <includeSynthetic>false</includeSynthetic>
             <ignoreMissingClasses>false</ignoreMissingClasses>
-            <!-- skip>false</skip -->
+            <skip>false</skip>
           </parameter>
-          <!-- dependencies>
+          <dependencies>
             <dependency>
               <groupId>org.apache.commons</groupId>
               <artifactId>commons-math3</artifactId>
               <version>3.4</version>
             </dependency>
-          </dependencies -->
+          </dependencies>
           <skip>false</skip>
         </configuration>
         <executions>
@@ -216,7 +216,7 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
+      </plugin -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
@@ -249,7 +249,7 @@
 
   <reporting>
     <plugins>
-      <plugin>
+      <!-- plugin>
         <groupId>com.github.siom79.japicmp</groupId>
         <artifactId>japicmp-maven-plugin</artifactId>
         <version>0.6.2</version>
@@ -274,7 +274,7 @@
             <ignoreMissingClasses>false</ignoreMissingClasses>
           </parameter>
         </configuration>
-      </plugin>
+      </plugin -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>

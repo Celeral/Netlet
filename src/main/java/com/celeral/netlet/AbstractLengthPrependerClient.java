@@ -22,7 +22,7 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.celeral.netlet.util.CThrowable;
+import com.celeral.netlet.util.Throwables;
 import com.celeral.netlet.util.VarInt;
 
 /**
@@ -277,17 +277,17 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
   {
     if (key != null && key.attachment() == this) {
       if (cce instanceof IOException) {
-        logger.debug("Disconnecting {} because of an exception.", this, cce);
+        logger.warn("Disconnecting {} because of an exception.", this, cce);
         if (isConnected()) {
           el.disconnect(this);
         }
       }
       else {
-        CThrowable.wrapIfChecked(cce);
+        throw Throwables.wrapIfChecked(cce);
       }
     }
     else {
-      logger.debug("Ignoring exception received after discarding the connection.", cce);
+      logger.warn("Ignoring exception received after discarding the connection.", cce);
     }
   }
 

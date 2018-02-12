@@ -20,23 +20,22 @@ import java.lang.reflect.Constructor;
 import static org.slf4j.helpers.MessageFormatter.arrayFormat;
 
 /**
- * Helper method to ensure that exceptions are propertly thrown.
- * If the cause is of type Error or RuntimeException then the
- * cause it thrown as it is. Otherwise the cause is wrapped in
- * a RuntimeException and the later is thrown.
+ * Helper method to ensure that exceptions are propertly thrown. If the cause is of type Error or RuntimeException then the cause it thrown as it is. Otherwise the cause is wrapped in a
+ * RuntimeException and the later is thrown.
  *
  * @since 1.0.0
  */
-public class CThrowable
+public class Throwables
 {
+
   public static RuntimeException wrapIfChecked(Throwable cause)
   {
     if (cause instanceof Error) {
-      throw (Error)cause;
+      throw (Error) cause;
     }
 
     if (cause instanceof RuntimeException) {
-      throw (RuntimeException)cause;
+      throw (RuntimeException) cause;
     }
 
     throw new RuntimeException(cause);
@@ -45,7 +44,7 @@ public class CThrowable
   public static RuntimeException wrapIfChecked(Exception exception)
   {
     if (exception instanceof RuntimeException) {
-      throw (RuntimeException)exception;
+      throw (RuntimeException) exception;
     }
 
     throw new RuntimeException(exception);
@@ -86,15 +85,15 @@ public class CThrowable
       instance = constructor.newInstance(message);
     }
     catch (Exception ex) {
-      throwFormatted(ex, RuntimeException.class,
-                     "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
-                     clazz.getName(), message);
+      throw throwFormatted(ex, RuntimeException.class,
+                           "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
+                           clazz.getName(), message);
     }
 
     throw instance;
   }
 
-  @SuppressWarnings( {"UseSpecificCatch", "InfiniteRecursion"})
+  @SuppressWarnings({"UseSpecificCatch", "InfiniteRecursion"})
   public static <T extends Throwable> T throwFormatted(Throwable cause, Class<T> clazz, String messagePattern, Object... args) throws T
   {
     String message = arrayFormat(messagePattern, args).getMessage();
@@ -106,9 +105,9 @@ public class CThrowable
     }
     catch (Exception ex) {
       // ex.addSuppressed(cause); -- we cannot add this without making this 1.6 incompatible, a deferred decision.
-      throwFormatted(ex, RuntimeException.class,
-                     "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
-                     clazz.getName(), message);
+      throw throwFormatted(ex, RuntimeException.class,
+                           "Couldn't throw exception of type {} with message {} as constructor that takes only message String was not found!",
+                           clazz.getName(), message);
     }
 
     throw instance;
