@@ -60,7 +60,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
         }
         catch (Exception ex) {
           Listener l = (Listener) sk.attachment();
-          logger.warn("Exception on SelectionKey {} associated with listener {}", sk, l, ex);
+          logger.debug("Exception on SelectionKey {} associated with listener {}", sk, l, ex);
           l.handleException(ex, defaultEventLoop);
         }
       }

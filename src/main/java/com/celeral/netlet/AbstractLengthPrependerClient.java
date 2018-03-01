@@ -277,7 +277,6 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
   {
     if (key != null && key.attachment() == this) {
       if (cce instanceof IOException) {
-        logger.warn("Disconnecting {} because of an exception.", this, cce);
         if (isConnected()) {
           el.disconnect(this);
         }
@@ -285,9 +284,6 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient imple
       else {
         throw Throwables.wrapIfChecked(cce);
       }
-    }
-    else {
-      logger.warn("Ignoring exception received after discarding the connection.", cce);
     }
   }
 
