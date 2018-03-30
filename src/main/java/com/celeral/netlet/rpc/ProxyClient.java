@@ -21,6 +21,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -28,6 +30,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.esotericsoftware.kryo.Serializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,6 +174,12 @@ public class ProxyClient implements InvocationHandler
     }
   }
 
+  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap();
+  public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
+  {
+    serializers.put(type, serializer);
+  }
+
   // whenenver method on the proxy instance is called, this method gets called.
   // it's imperial that we are able to serialize all this information and send
   // it over the pipe!
@@ -179,6 +189,9 @@ public class ProxyClient implements InvocationHandler
     do {
       if (client == null) {
         client = new DelegatingClient(futureResponses);
+        for (Map.Entry<Class<?>, Serializer<?>> entry : serializers.entrySet()) {
+          client.addDefaultSerializer(entry.getKey(), entry.getValue());
+        }
         agent.connect(client);
       }
       else if (!client.isConnected()) {
