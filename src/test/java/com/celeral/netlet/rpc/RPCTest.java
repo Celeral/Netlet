@@ -24,6 +24,7 @@ import java.nio.channels.SocketChannel;
 
 import com.celeral.netlet.AbstractServer;
 import com.celeral.netlet.DefaultEventLoop;
+import com.celeral.netlet.rpc.ConnectionAgent.SimpleConnectionAgent;
 import com.celeral.netlet.rpc.ProxyClient.ExecutingClient;
 import java.util.concurrent.Executors;
 
@@ -123,7 +124,7 @@ public class RPCTest
       }
 
       try {
-        ProxyClient client = new ProxyClient((InetSocketAddress)si, el);
+        ProxyClient client = new ProxyClient(new SimpleConnectionAgent((InetSocketAddress)si, el), TimeoutPolicy.NO_TIMEOUT_POLICY);
         HelloWorld helloWorld = (HelloWorld)client.create(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
         Assert.assertFalse("Before Greeted!", helloWorld.hasGreeted());
 

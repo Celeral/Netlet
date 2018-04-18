@@ -386,7 +386,15 @@ public class DefaultEventLoop implements Runnable, EventLoop
     Thread currentThread = Thread.currentThread();
     logger.debug("Submitted Task {}.{}.{}", currentThread, r, eventThread);
     if (tasks.isEmpty() && eventThread == currentThread) {
-      r.run();
+      if (logger.isDebugEnabled()) {
+        logger.debug("Starting Task {}", r);
+        long nanoTime = System.nanoTime();
+        r.run();
+        logger.debug("Finished Task {} after {}", r, System.nanoTime() - nanoTime);
+      }
+      else {
+        r.run();
+      }
     }
     else {
       synchronized (tasks) {
@@ -586,23 +594,22 @@ public class DefaultEventLoop implements Runnable, EventLoop
               l.unregistered(key);
             }
             finally {
-
-              boolean disconnected = true;
               if (key.isValid()) {
                 if ((key.interestOps() & SelectionKey.OP_WRITE) != 0) {
                   key.attach(new Listener.DisconnectingListener(key));
-                  disconnected = false;
+                }
+                else {
+                  try {
+                    key.attach(Listener.NOOP_CLIENT_LISTENER);
+                    key.channel().close();
+                  }
+                  catch (IOException io) {
+                    l.handleException(io, DefaultEventLoop.this);
+                  }                  
                 }
               }
-
-              if (disconnected) {
-                try {
-                  key.attach(Listener.NOOP_CLIENT_LISTENER);
-                  key.channel().close();
-                }
-                catch (IOException io) {
-                  l.handleException(io, DefaultEventLoop.this);
-                }
+              else {
+                logger.warn("Invalid selector key {} for listener {}", key, l);
               }
             }
           }

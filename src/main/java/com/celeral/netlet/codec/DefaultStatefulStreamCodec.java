@@ -23,8 +23,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import com.celeral.netlet.util.DTThrowable;
+import com.celeral.netlet.util.Throwables;
 import com.celeral.netlet.util.Slice;
+
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Registration;
 import com.esotericsoftware.kryo.io.Input;
@@ -158,7 +159,7 @@ public class DefaultStatefulStreamCodec<T> extends Kryo implements StatefulStrea
       logger.info("Cascading issue while writing debugging data to address original exception", ex1);
     }
 
-    throw DTThrowable.wrapIfChecked(ex);
+    throw Throwables.wrapIfChecked(ex);
   }
 
   @Override

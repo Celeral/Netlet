@@ -16,36 +16,40 @@
 package com.celeral.netlet.rpc;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.concurrent.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.esotericsoftware.kryo.Serializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.celeral.netlet.EventLoop;
 import com.celeral.netlet.rpc.Client.ExtendedRPC;
 import com.celeral.netlet.rpc.Client.RPC;
 import com.celeral.netlet.rpc.Client.RR;
-import java.lang.reflect.InvocationTargetException;
 
 /**
  * The class is abstract so that we can resolve the type T at runtime.
  *
- * @author Chetan Narsude  {@literal <chetan@apache.org>}
+ * @author Chetan Narsude {@literal <chetan@apache.org>}
  */
 public class ProxyClient implements InvocationHandler
 {
-  InetSocketAddress address;
-  EventLoop eventLoop;
+  private TimeoutPolicy policy;
+  private ConnectionAgent agent;
   DelegatingClient client;
-
-  private long timeoutMillis;
 
   ConcurrentLinkedQueue<RPCFuture> futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
 
@@ -54,7 +58,7 @@ public class ProxyClient implements InvocationHandler
    */
   public static class RPCFuture implements Future<Object>
   {
-    RPC rpc;
+    private final RPC rpc;
     AtomicReference<RR> rr;
 
     public RPCFuture(RPC rpc, RR rr)
@@ -101,18 +105,18 @@ public class ProxyClient implements InvocationHandler
     public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
     {
       if (rr.get() == null) {
-        long expiryMillis = System.currentTimeMillis() + unit.toMillis(timeout);
-
-        RPC r = rpc;
+        long diff = unit.toMillis(timeout);
+        long waitUntil = System.currentTimeMillis() + diff;
         do {
-          long waitMillis = expiryMillis - System.currentTimeMillis();
-          if (waitMillis > 0) {
-            synchronized (r) {
-              r.wait(waitMillis);
-            }
+          synchronized (rpc) {
+            rpc.wait(diff);
+          }
+
+          if (rr.get() != null) {
+            break;
           }
         }
-        while (rr.get() == null);
+        while ((diff = waitUntil - System.currentTimeMillis()) > 0);
       }
 
       RR r = rr.get();
@@ -129,11 +133,10 @@ public class ProxyClient implements InvocationHandler
 
   }
 
-  public ProxyClient(InetSocketAddress address, EventLoop eventloop)
+  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy)
   {
-    this.timeoutMillis = Long.MAX_VALUE;
-    this.address = address;
-    this.eventLoop = eventloop;
+    this.policy = policy;
+    this.agent = agent;
   }
 
   public Object create(ClassLoader loader, Class<?>[] interfaces)
@@ -158,7 +161,6 @@ public class ProxyClient implements InvocationHandler
 //      }
 //    }
 
-    client = new DelegatingClient(futureResponses);
     return Proxy.newProxyInstance(loader, interfaces, this);
   }
 
@@ -166,10 +168,16 @@ public class ProxyClient implements InvocationHandler
   {
     if (client != null) {
       if (client.isConnected()) {
-        eventLoop.disconnect(client);
+        agent.disconnect(client);
       }
       client = null;
     }
+  }
+
+  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap();
+  public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
+  {
+    serializers.put(type, serializer);
   }
 
   // whenenver method on the proxy instance is called, this method gets called.
@@ -178,38 +186,32 @@ public class ProxyClient implements InvocationHandler
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
   {
-    if (!client.isConnected()) {
-      eventLoop.connect(address, client);
-    }
-
-    RPCFuture future = new RPCFuture(client.send(method, args));
-    futureResponses.add(future);
-
-    if (future.isDone() == false) {
-      long diff = timeoutMillis;
-      long waitUntil = System.currentTimeMillis() + diff;
-      do {
-        synchronized (future) {
-          future.wait(diff);
+    do {
+      if (client == null) {
+        client = new DelegatingClient(futureResponses);
+        for (Map.Entry<Class<?>, Serializer<?>> entry : serializers.entrySet()) {
+          client.addDefaultSerializer(entry.getKey(), entry.getValue());
         }
-
-        if (future.isDone()) {
-          break;
-        }
+        agent.connect(client);
       }
-      while ((diff = waitUntil - System.currentTimeMillis()) > 0);
+      else if (!client.isConnected()) {
+        agent.connect(client);
+      }
 
-      if (diff <= 0) {
-        throw new TimeoutException("Method " + method.toString() + " timed out!");
+      RPCFuture future = new RPCFuture(client.send(method, args));
+      futureResponses.add(future);
+
+      try {
+        return future.get(getPolicy().getTimeoutMillis(), TimeUnit.MILLISECONDS);
+      }
+      catch (TimeoutException ex) {
+        getPolicy().handleTimeout(this, ex);
+      }
+      catch (ExecutionException ex) {
+        throw ex.getCause();
       }
     }
-
-    RR rr = future.rr.get();
-    if (rr.exception != null) {
-      throw rr.exception;
-    }
-
-    return rr.response;
+    while (true);
   }
 
   public static class DelegatingClient extends Client<RR>
@@ -234,8 +236,8 @@ public class ProxyClient implements InvocationHandler
         int id = next.rpc.id;
         if (id == rr.id) {
           next.rr.set(rr);
-          synchronized (next) {
-            next.notifyAll();
+          synchronized (next.rpc) {
+            next.rpc.notifyAll();
           }
           iterator.remove();
           break;
@@ -261,8 +263,8 @@ public class ProxyClient implements InvocationHandler
       send(rpc);
       return rpc;
     }
-  }
 
+  }
 
   public static class ExecutingClient extends Client<RPC>
   {
@@ -301,7 +303,7 @@ public class ProxyClient implements InvocationHandler
           String methodGenericstring = ((ExtendedRPC)message).methodGenericstring;
 
           for (Class<?> intf : interfaces) {
-            for (Method m: intf.getMethods()) {
+            for (Method m : intf.getMethods()) {
               logger.trace("genericString = {}", m.toGenericString());
               if (methodGenericstring.equals(m.toGenericString())) {
                 methodMap.put(message.methodId, m);
@@ -334,23 +336,43 @@ public class ProxyClient implements InvocationHandler
 
       send(rr);
     }
+
+  }
+
+  /**
+   * @return the agent
+   */
+  public ConnectionAgent getConnectionAgent()
+  {
+    return agent;
+  }
+
+  /**
+   * @param agent the agent to set
+   */
+  public void setConnectionAgent(ConnectionAgent agent)
+  {
+    if (client != null) {
+      destroy();
+    }
+    this.agent = agent;
+  }
+
+  /**
+   * @return the policy
+   */
+  public TimeoutPolicy getPolicy()
+  {
+    return policy;
+  }
+
+  /**
+   * @param policy the policy to set
+   */
+  public void setPolicy(TimeoutPolicy policy)
+  {
+    this.policy = policy;
   }
 
   private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);
-
-  /**
-   * @return the timeoutMillis
-   */
-  public long getTimeoutMillis()
-  {
-    return timeoutMillis;
-  }
-
-  /**
-   * @param timeoutMillis the timeoutMillis to set
-   */
-  public void setTimeoutMillis(long timeoutMillis)
-  {
-    this.timeoutMillis = timeoutMillis;
-  }
 }

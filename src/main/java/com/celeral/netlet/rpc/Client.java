@@ -26,20 +26,25 @@ import com.celeral.netlet.codec.DefaultStatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec.DataStatePair;
 import com.celeral.netlet.util.Slice;
+
 import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
+
 import java.util.concurrent.ExecutorService;
+
+import com.esotericsoftware.kryo.Serializer;
 
 /**
  *
- * @author Chetan Narsude  {@literal <chetan@apache.org>}
+ * @author Chetan Narsude {@literal <chetan@apache.org>}
  *
  * @param <T> - Type of the object that's received by the client.
  */
 public abstract class Client<T> extends AbstractLengthPrependerClient
 {
   Slice state;
-  protected final StatefulStreamCodec<Object> serde;
+  private final DefaultStatefulStreamCodec<Object> privateSerdes;
+  protected final StatefulStreamCodec<Object> serdes;
   protected final ExecutorService executors;
 
   Client()
@@ -47,26 +52,31 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
     this(null);
   }
 
-
   public Client(ExecutorService executors)
   {
-    DefaultStatefulStreamCodec<Object> lSerde = new DefaultStatefulStreamCodec<Object>();
+    privateSerdes = new DefaultStatefulStreamCodec<Object>();
 
     /* setup the classes that we know about before hand */
-    lSerde.register(Ack.class);
-    lSerde.register(RPC.class);
-    lSerde.register(ExtendedRPC.class);
-    lSerde.register(RR.class);
-    this.serde = executors == null ? lSerde : StatefulStreamCodec.Synchronized.wrap(lSerde);
+    privateSerdes.register(Ack.class);
+    privateSerdes.register(RPC.class);
+    privateSerdes.register(ExtendedRPC.class);
+    privateSerdes.register(RR.class);
+    this.serdes = executors == null ? privateSerdes : StatefulStreamCodec.Synchronized.wrap(privateSerdes);
     this.executors = executors;
+    
   }
 
+  public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
+  {
+    privateSerdes.register(type, serializer);
+  }
+  
   public abstract void onMessage(T message);
 
   protected void send(final Object object)
   {
     if (executors == null) {
-      writeObject(serde.toDataStatePair(object));
+      writeObject(serdes.toDataStatePair(object));
     }
     else {
       executors.submit(new Runnable()
@@ -75,7 +85,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
         public void run()
         {
           synchronized (Client.this) {
-            writeObject(serde.toDataStatePair(object));
+            writeObject(serdes.toDataStatePair(object));
           }
         }
 
@@ -109,7 +119,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
         pair.data = new Slice(buffer, offset, size);
         logger.trace("Identified data = {}", pair.data);
         if (executors == null) {
-          onMessage((T)serde.fromDataStatePair(pair));
+          onMessage((T)serdes.fromDataStatePair(pair));
         }
         else {
           executors.submit(new Runnable()
@@ -117,7 +127,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
             @Override
             public void run()
             {
-              onMessage((T)serde.fromDataStatePair(pair));
+              onMessage((T)serdes.fromDataStatePair(pair));
             }
           });
         }
