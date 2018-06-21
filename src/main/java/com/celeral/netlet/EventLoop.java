@@ -15,7 +15,7 @@
  */
 package com.celeral.netlet;
 
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
 import com.celeral.netlet.Listener.ClientListener;
 import com.celeral.netlet.Listener.ServerListener;
@@ -28,13 +28,13 @@ import com.celeral.netlet.Listener.ServerListener;
 //Convert the return types to future.
 public interface EventLoop
 {
-  void connect(final InetSocketAddress address, final ClientListener l);
+  void connect(SocketAddress address, ClientListener l);
 
-  void disconnect(final ClientListener l);
+  void disconnect(ClientListener l);
 
-  void start(final InetSocketAddress address, final ServerListener l);
+  void start(SocketAddress address, ServerListener l);
 
-  void stop(final ServerListener l);
+  void stop(ServerListener l);
 
   void submit(Runnable r);
 
