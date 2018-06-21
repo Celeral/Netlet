@@ -16,7 +16,7 @@
 package com.celeral.netlet;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.channels.*;
 import java.nio.channels.spi.AbstractSelectableChannel;
 import java.util.*;
@@ -99,7 +99,9 @@ public class DefaultEventLoop implements Runnable, EventLoop
   public synchronized Thread start()
   {
     if (++refCount == 1) {
-      (eventThread = new Thread(this, id)).start();
+      eventThread = new Thread(this, id);
+      eventThread.setDaemon(true);
+      eventThread.start();
     }
     return eventThread;
   }
@@ -467,7 +469,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
   }
 
   @Override
-  public final void connect(final InetSocketAddress address, final ClientListener l)
+  public final void connect(final SocketAddress address, final ClientListener l)
   {
     submit(new Runnable()
     {
@@ -626,7 +628,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
   }
 
   @Override
-  public final void start(final InetSocketAddress address, final ServerListener l)
+  public final void start(final SocketAddress address, final ServerListener l)
   {
     submit(new Runnable()
     {

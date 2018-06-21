@@ -63,14 +63,13 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
     privateSerdes.register(RR.class);
     this.serdes = executors == null ? privateSerdes : StatefulStreamCodec.Synchronized.wrap(privateSerdes);
     this.executors = executors;
-    
   }
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {
     privateSerdes.register(type, serializer);
   }
-  
+
   public abstract void onMessage(T message);
 
   protected void send(final Object object)

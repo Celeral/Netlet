@@ -15,7 +15,7 @@
  */
 package com.celeral.netlet.rpc;
 
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
 import com.celeral.netlet.EventLoop;
 import com.celeral.netlet.Listener.ClientListener;
@@ -31,9 +31,9 @@ public interface ConnectionAgent
 
   class SimpleConnectionAgent implements ConnectionAgent
   {
-    public final InetSocketAddress address;
+    public final SocketAddress address;
     public final EventLoop eventloop;
-    public SimpleConnectionAgent(InetSocketAddress address, EventLoop eventLoop)
+    public SimpleConnectionAgent(SocketAddress address, EventLoop eventLoop)
     {
       this.address = address;
       this.eventloop = eventLoop;
