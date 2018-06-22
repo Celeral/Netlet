@@ -339,6 +339,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
         sc.configureBlocking(false);
         final ServerListener sl = (ServerListener)sk.attachment();
         final ClientListener l = sl.getClientConnection(sc, (ServerSocketChannel)sk.channel());
+        l.connected();
         register(sc, SelectionKey.OP_READ | SelectionKey.OP_WRITE, l);
         break;
 
@@ -456,13 +457,6 @@ public class DefaultEventLoop implements Runnable, EventLoop
     });
   }
 
-  //@Override
-  public void register(ServerSocketChannel channel, Listener l)
-  {
-    register(channel, SelectionKey.OP_ACCEPT, l);
-  }
-
-  //@Override
   public void register(SocketChannel channel, int ops, Listener l)
   {
     register((AbstractSelectableChannel)channel, ops, l);
@@ -603,6 +597,7 @@ public class DefaultEventLoop implements Runnable, EventLoop
                 else {
                   try {
                     key.attach(Listener.NOOP_CLIENT_LISTENER);
+                    l.disconnected();
                     key.channel().close();
                   }
                   catch (IOException io) {

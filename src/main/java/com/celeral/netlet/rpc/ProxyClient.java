@@ -15,6 +15,8 @@
  */
 package com.celeral.netlet.rpc;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -25,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -39,19 +40,31 @@ import org.slf4j.LoggerFactory;
 import com.celeral.netlet.rpc.Client.ExtendedRPC;
 import com.celeral.netlet.rpc.Client.RPC;
 import com.celeral.netlet.rpc.Client.RR;
+import com.celeral.netlet.util.Throwables;
 
 /**
  * The class is abstract so that we can resolve the type T at runtime.
  *
  * @author Chetan Narsude {@literal <chetan@apache.org>}
  */
-public class ProxyClient implements InvocationHandler
+public class ProxyClient implements InvocationHandler, Closeable
 {
   private TimeoutPolicy policy;
   private ConnectionAgent agent;
   DelegatingClient client;
 
   ConcurrentLinkedQueue<RPCFuture> futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
+
+  @Override
+  public void close() throws IOException
+  {
+    if (client != null) {
+      if (client.isConnected()) {
+        agent.disconnect(client);
+      }
+      client = null;
+    }
+  }
 
   /**
    * Future for tracking the asynchronous responses to the RPC call.
@@ -164,17 +177,8 @@ public class ProxyClient implements InvocationHandler
     return Proxy.newProxyInstance(loader, interfaces, this);
   }
 
-  public void destroy()
-  {
-    if (client != null) {
-      if (client.isConnected()) {
-        agent.disconnect(client);
-      }
-      client = null;
-    }
-  }
-
   private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap();
+
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {
     serializers.put(type, serializer);
@@ -280,9 +284,9 @@ public class ProxyClient implements InvocationHandler
       this.methodMap = new HashMap<Integer, Method>();
     }
 
-    public ExecutingClient(Object executor, Class<?>[] interfaces, ExecutorService executors)
+    public ExecutingClient(Object executor, Class<?>[] interfaces, int poolsize)
     {
-      super(executors);
+      super(poolsize);
       this.executor = executor;
       this.interfaces = interfaces;
       this.methodMap = new HashMap<Integer, Method>();
@@ -352,8 +356,12 @@ public class ProxyClient implements InvocationHandler
    */
   public void setConnectionAgent(ConnectionAgent agent)
   {
-    if (client != null) {
-      destroy();
+    try {
+      close();
+    }
+    catch (Exception ex) {
+      throw Throwables.throwFormatted(ex, RuntimeException.class,
+                                      "Unable to set connection agent {}!", agent);
     }
     this.agent = agent;
   }

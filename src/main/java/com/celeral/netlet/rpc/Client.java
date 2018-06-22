@@ -18,6 +18,10 @@ package com.celeral.netlet.rpc;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,14 +29,9 @@ import com.celeral.netlet.AbstractLengthPrependerClient;
 import com.celeral.netlet.codec.DefaultStatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec.DataStatePair;
+import com.celeral.netlet.util.CircularBuffer;
 import com.celeral.netlet.util.Slice;
-
-import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
-
-import java.util.concurrent.ExecutorService;
-
-import com.esotericsoftware.kryo.Serializer;
+import com.celeral.netlet.util.Throwables;
 
 /**
  *
@@ -45,24 +44,54 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
   Slice state;
   private final DefaultStatefulStreamCodec<Object> privateSerdes;
   protected final StatefulStreamCodec<Object> serdes;
-  protected final ExecutorService executors;
+
+  // i would like these to be elastic!
+  final CircularBuffer<Object> sendQueue = new CircularBuffer<Object>(1024);
+  final CircularBuffer<DataStatePair> receiveQueue = new CircularBuffer<DataStatePair>(1024);
+  AtomicInteger aggregateQueueSize = new AtomicInteger();
+  private Thread[] threads;
 
   Client()
   {
-    this(null);
+    this(2);
   }
 
-  public Client(ExecutorService executors)
+  public Client(int threadCount)
   {
     privateSerdes = new DefaultStatefulStreamCodec<Object>();
-
     /* setup the classes that we know about before hand */
     privateSerdes.register(Ack.class);
     privateSerdes.register(RPC.class);
     privateSerdes.register(ExtendedRPC.class);
     privateSerdes.register(RR.class);
-    this.serdes = executors == null ? privateSerdes : StatefulStreamCodec.Synchronized.wrap(privateSerdes);
-    this.executors = executors;
+
+    serdes = StatefulStreamCodec.Synchronized.wrap(privateSerdes);
+    threads = new Thread[threadCount];
+  }
+
+  @Override
+  public void disconnected()
+  {
+    logger.debug("{} disconnected!", this);
+    final Thread[] ts = threads;
+    synchronized (ioRunnable) {
+      threads = null;
+      for (Thread t : ts) {
+        t.interrupt();
+      }
+    }
+    super.disconnected();
+  }
+
+  @Override
+  public void connected()
+  {
+    logger.debug("{} connected!", this);
+    super.connected();
+    int i = threads.length;
+    while (i-- > 0) {
+      (threads[i] = new Thread(ioRunnable)).start();
+    }
   }
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
@@ -74,25 +103,116 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
 
   protected void send(final Object object)
   {
-    if (executors == null) {
-      writeObject(serdes.toDataStatePair(object));
+    try {
+      sendQueue.put(object);
     }
-    else {
-      executors.submit(new Runnable()
-      {
-        @Override
-        public void run()
-        {
-          synchronized (Client.this) {
-            writeObject(serdes.toDataStatePair(object));
-          }
+    catch (InterruptedException ex) {
+      synchronized (ioRunnable) {
+        if (threads != null) {
+          throw Throwables.throwFormatted(ex, RuntimeException.class,
+                                          "Interrupted while sending the object {}", object);
         }
-
-      });
+      }
+    }
+    if (aggregateQueueSize.incrementAndGet() == 1) {
+      synchronized (ioRunnable) {
+        ioRunnable.notify();
+      }
     }
   }
 
-  private void writeObject(DataStatePair pair)
+  private final Runnable ioRunnable = new Runnable()
+  {
+    /**
+     * Due to memory model of java, last is almost like a thread
+     * local variable which we use to give each thread an affinity
+     * towards the send queue or the receive queue dynamically.
+     */
+    boolean last = System.currentTimeMillis() % 2 == 0;
+
+    @Override
+    public void run()
+    {
+      try {
+        while (true) {
+          /* wait for an invitation until we have something to consume */
+          while (aggregateQueueSize.get() == 0) {
+            synchronized (ioRunnable) {
+              ioRunnable.wait();
+            }
+          }
+
+          /* if there is more than we can consume, call for help */
+          if (aggregateQueueSize.decrementAndGet() > 0) {
+            synchronized (ioRunnable) {
+              ioRunnable.notify();
+            }
+          }
+
+          DataStatePair pair;
+          Object object;
+
+          /*
+           * first check the queue where we found something last time,
+           * if there is nothing this time, remember it so that next time
+           * we will go to different queue.
+           *
+           */
+          if (last) {
+            synchronized (sendQueue) {
+              object = sendQueue.poll();
+            }
+            if (object == null) {
+              last = false;
+              synchronized (receiveQueue) {
+                pair = receiveQueue.poll();
+              }
+              synchronized (serdes) {
+                object = serdes.fromDataStatePair(pair);
+              }
+              onMessage((T)object);
+            }
+            else {
+              synchronized (serdes) {
+                pair = serdes.toDataStatePair(object);
+              }
+              writeObject(pair);
+            }
+          }
+          else {
+            synchronized (receiveQueue) {
+              pair = receiveQueue.poll();
+            }
+            if (pair == null) {
+              last = true;
+              synchronized (sendQueue) {
+                object = sendQueue.poll();
+              }
+              synchronized (serdes) {
+                pair = serdes.toDataStatePair(object);
+              }
+              writeObject(pair);
+            }
+            else {
+              synchronized (serdes) {
+                object = serdes.fromDataStatePair(pair);
+              }
+              onMessage((T)object);
+            }
+          }
+        }
+      }
+      catch (InterruptedException ex) {
+        synchronized (ioRunnable) {
+          if (threads != null) {
+            throw Throwables.throwFormatted(RuntimeException.class, "Interrupted while waiting for an IO workload!");
+          }
+        }
+      }
+    }
+  };
+
+  private synchronized void writeObject(DataStatePair pair)
   {
     if (pair.state != null) {
       logger.trace("sending state = {}", pair.state);
@@ -115,20 +235,25 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
       else {
         final DataStatePair pair = new DataStatePair();
         pair.state = state;
+        state = null;
         pair.data = new Slice(buffer, offset, size);
         logger.trace("Identified data = {}", pair.data);
-        if (executors == null) {
-          onMessage((T)serdes.fromDataStatePair(pair));
+        try {
+          receiveQueue.put(pair);
         }
-        else {
-          executors.submit(new Runnable()
-          {
-            @Override
-            public void run()
-            {
-              onMessage((T)serdes.fromDataStatePair(pair));
+        catch (InterruptedException ex) {
+          synchronized (ioRunnable) {
+            if (threads != null) {
+              throw Throwables.throwFormatted(ex, RuntimeException.class,
+                                              "Interrupted while processing received buffer {}!", pair);
             }
-          });
+          }
+        }
+
+        if (aggregateQueueSize.incrementAndGet() == 1) {
+          synchronized (ioRunnable) {
+            ioRunnable.notify();
+          }
         }
       }
     }
@@ -251,7 +376,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
     @Override
     public String toString()
     {
-      return "ExtendedRPC{" + "methodGenericstring=" + methodGenericstring + '}' + super.toString();
+      return "ExtendedRPC@" + System.identityHashCode(this) + '{' + "methodGenericstring=" + methodGenericstring + '}' + super.toString();
     }
 
   }

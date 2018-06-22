@@ -16,15 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package com.celeral.netlet.codec;
 
 import com.celeral.netlet.util.Slice;
 
 /**
- * <p>StatefulStreamCodec interface.</p>
+ * <p>
+ * StatefulStreamCodec interface.</p>
  *
  * @param <T>
+ *
  * @since 0.3.2
  */
 public interface StatefulStreamCodec<T>
@@ -58,12 +59,20 @@ public interface StatefulStreamCodec<T>
      * the accompanying data field may not make it to the deserializer.
      */
     public Slice state;
+
+    @Override
+    public String toString()
+    {
+      return "DataStatePair{" + "data=" + data + ", state=" + state + '}';
+    }
+
   }
 
   /**
    * Create POJO from the byte array for consumption by the downstream.
    *
    * @param dspair
+   *
    * @return plain old java object, the type is intentionally not T since the consumer does not care for it.
    */
   Object fromDataStatePair(DataStatePair dspair);
@@ -73,6 +82,7 @@ public interface StatefulStreamCodec<T>
    * it can be transmitted or stored in file
    *
    * @param object plain old java object
+   *
    * @return serialized representation of the object
    */
   DataStatePair toDataStatePair(T object);
@@ -87,13 +97,13 @@ public interface StatefulStreamCodec<T>
    */
   void resetState();
 
-
   static class Synchronized
   {
     static class $tatefulStreamCodec<T> implements com.celeral.netlet.codec.StatefulStreamCodec<T>
     {
       private final StatefulStreamCodec<T> codec;
       private final Object mutex;
+
       $tatefulStreamCodec(StatefulStreamCodec<T> codec, Object mutex)
       {
         this.mutex = mutex;
