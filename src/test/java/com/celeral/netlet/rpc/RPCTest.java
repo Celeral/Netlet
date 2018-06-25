@@ -21,6 +21,9 @@ import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.celeral.netlet.AbstractServer;
 import com.celeral.netlet.DefaultEventLoop;
@@ -71,19 +74,17 @@ public class RPCTest
 
   public static class Server extends AbstractServer
   {
-    private final boolean multithreaded;
+    private final Executor executor;
 
-    public Server(boolean multithreaded)
+    public Server(Executor executor)
     {
-      this.multithreaded = multithreaded;
+      this.executor = executor;
     }
 
     @Override
     public ClientListener getClientConnection(SocketChannel client, ServerSocketChannel server)
     {
-      return multithreaded
-      ? new ExecutingClient(new HelloWorldImpl(), new Class<?>[]{HelloWorld.class}, 10)
-      : new ExecutingClient(new HelloWorldImpl(), new Class<?>[]{HelloWorld.class});
+      return new ExecutingClient(new HelloWorldImpl(), new Class<?>[]{HelloWorld.class}, executor);
     }
 
     @Override
@@ -100,21 +101,34 @@ public class RPCTest
   @Test
   public void testRPCMultiThreaded() throws IOException, InterruptedException
   {
-    testRPC(true);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      testRPC(executor);
+    }
+    finally {
+      executor.shutdown();
+    }
   }
 
   @Test
   public void testRPCSingleThreaded() throws IOException, InterruptedException
   {
-    testRPC(false);
+    testRPC(new Executor()
+    {
+      @Override
+      public void execute(Runnable command)
+      {
+        command.run();
+      }
+    });
   }
 
-  public void testRPC(boolean multithreaded) throws IOException, InterruptedException
+  public void testRPC(Executor executor) throws IOException, InterruptedException
   {
     DefaultEventLoop el = DefaultEventLoop.createEventLoop("rpc");
     el.start();
     try {
-      Server server = new Server(multithreaded);
+      Server server = new Server(executor);
       el.start(new InetSocketAddress(0), server);
 
       SocketAddress si;
@@ -125,7 +139,9 @@ public class RPCTest
       }
 
       try {
-        ProxyClient client = new ProxyClient(new SimpleConnectionAgent((InetSocketAddress)si, el), TimeoutPolicy.NO_TIMEOUT_POLICY);
+        ProxyClient client = new ProxyClient(new SimpleConnectionAgent((InetSocketAddress)si, el),
+                                             TimeoutPolicy.NO_TIMEOUT_POLICY,
+                                             executor);
         try {
           HelloWorld helloWorld = (HelloWorld)client.create(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
           Assert.assertFalse("Before Greeted!", helloWorld.hasGreeted());

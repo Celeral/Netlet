@@ -25,8 +25,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -53,7 +55,8 @@ public class ProxyClient implements InvocationHandler, Closeable
   private ConnectionAgent agent;
   DelegatingClient client;
 
-  ConcurrentLinkedQueue<RPCFuture> futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
+  ConcurrentLinkedQueue<RPCFuture> futureResponses;
+  private Executor executors;
 
   @Override
   public void close() throws IOException
@@ -146,10 +149,12 @@ public class ProxyClient implements InvocationHandler, Closeable
 
   }
 
-  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy)
+  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy, Executor executors)
   {
+    this.futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
     this.policy = policy;
     this.agent = agent;
+    this.executors = executors;
   }
 
   public Object create(ClassLoader loader, Class<?>[] interfaces)
@@ -192,7 +197,7 @@ public class ProxyClient implements InvocationHandler, Closeable
   {
     do {
       if (client == null) {
-        client = new DelegatingClient(futureResponses);
+        client = new DelegatingClient(futureResponses, executors);
         for (Map.Entry<Class<?>, Serializer<?>> entry : serializers.entrySet()) {
           client.addDefaultSerializer(entry.getKey(), entry.getValue());
         }
@@ -223,9 +228,9 @@ public class ProxyClient implements InvocationHandler, Closeable
     HashMap<Method, Integer> methodMap;
     private final ConcurrentLinkedQueue<RPCFuture> futureResponses;
 
-    DelegatingClient(ConcurrentLinkedQueue<RPCFuture> futureResponses)
+    DelegatingClient(ConcurrentLinkedQueue<RPCFuture> futureResponses, Executor executors)
     {
-      super();
+      super(executors);
       this.futureResponses = futureResponses;
       methodMap = new HashMap<Method, Integer>();
     }
@@ -272,24 +277,16 @@ public class ProxyClient implements InvocationHandler, Closeable
 
   public static class ExecutingClient extends Client<RPC>
   {
-    HashMap<Integer, Method> methodMap;
+    ConcurrentHashMap<Integer, Method> methodMap;
     public final Object executor;
     private final Class<?>[] interfaces;
 
-    public ExecutingClient(Object executor, Class<?>[] interfaces)
+    public ExecutingClient(Object executor, Class<?>[] interfaces, Executor executors)
     {
-      super();
+      super(executors);
       this.executor = executor;
       this.interfaces = interfaces;
-      this.methodMap = new HashMap<Integer, Method>();
-    }
-
-    public ExecutingClient(Object executor, Class<?>[] interfaces, int poolsize)
-    {
-      super(poolsize);
-      this.executor = executor;
-      this.interfaces = interfaces;
-      this.methodMap = new HashMap<Integer, Method>();
+      this.methodMap = new ConcurrentHashMap<Integer, Method>();
     }
 
     @Override
@@ -359,7 +356,7 @@ public class ProxyClient implements InvocationHandler, Closeable
     try {
       close();
     }
-    catch (Exception ex) {
+    catch (IOException ex) {
       throw Throwables.throwFormatted(ex, RuntimeException.class,
                                       "Unable to set connection agent {}!", agent);
     }

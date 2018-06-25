@@ -16,6 +16,7 @@
 package com.celeral.netlet.rpc;
 
 import java.util.Arrays;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.esotericsoftware.kryo.Serializer;
@@ -27,11 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import com.celeral.netlet.AbstractLengthPrependerClient;
 import com.celeral.netlet.codec.DefaultStatefulStreamCodec;
-import com.celeral.netlet.codec.StatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec.DataStatePair;
-import com.celeral.netlet.util.CircularBuffer;
 import com.celeral.netlet.util.Slice;
-import com.celeral.netlet.util.Throwables;
 
 /**
  *
@@ -42,175 +40,66 @@ import com.celeral.netlet.util.Throwables;
 public abstract class Client<T> extends AbstractLengthPrependerClient
 {
   Slice state;
-  private final DefaultStatefulStreamCodec<Object> privateSerdes;
-  protected final StatefulStreamCodec<Object> serdes;
+  private final DefaultStatefulStreamCodec<Object> serdes;
+  private transient Executor executors;
 
-  // i would like these to be elastic!
-  final CircularBuffer<Object> sendQueue = new CircularBuffer<Object>(1024);
-  final CircularBuffer<DataStatePair> receiveQueue = new CircularBuffer<DataStatePair>(1024);
-  AtomicInteger aggregateQueueSize = new AtomicInteger();
-  private Thread[] threads;
-
-  Client()
+  private static class DirectExecutor implements Executor
   {
-    this(2);
+    @Override
+    public void execute(Runnable command)
+    {
+      command.run();
+    }
   }
 
-  public Client(int threadCount)
+  private Client()
   {
-    privateSerdes = new DefaultStatefulStreamCodec<Object>();
+    this(new DirectExecutor());
+  }
+
+  public Client(Executor executors)
+  {
+    this.executors = executors;
+
+    serdes = new DefaultStatefulStreamCodec<Object>();
     /* setup the classes that we know about before hand */
-    privateSerdes.register(Ack.class);
-    privateSerdes.register(RPC.class);
-    privateSerdes.register(ExtendedRPC.class);
-    privateSerdes.register(RR.class);
-
-    serdes = StatefulStreamCodec.Synchronized.wrap(privateSerdes);
-    threads = new Thread[threadCount];
-  }
-
-  @Override
-  public void disconnected()
-  {
-    logger.debug("{} disconnected!", this);
-    final Thread[] ts = threads;
-    synchronized (ioRunnable) {
-      threads = null;
-      for (Thread t : ts) {
-        t.interrupt();
-      }
-    }
-    super.disconnected();
-  }
-
-  @Override
-  public void connected()
-  {
-    logger.debug("{} connected!", this);
-    super.connected();
-    int i = threads.length;
-    while (i-- > 0) {
-      (threads[i] = new Thread(ioRunnable)).start();
-    }
+    serdes.register(Ack.class);
+    serdes.register(RPC.class);
+    serdes.register(ExtendedRPC.class);
+    serdes.register(RR.class);
   }
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {
-    privateSerdes.register(type, serializer);
+    serdes.register(type, serializer);
   }
 
   public abstract void onMessage(T message);
 
-  protected void send(final Object object)
+  class Sender implements Runnable
   {
-    try {
-      sendQueue.put(object);
-    }
-    catch (InterruptedException ex) {
-      synchronized (ioRunnable) {
-        if (threads != null) {
-          throw Throwables.throwFormatted(ex, RuntimeException.class,
-                                          "Interrupted while sending the object {}", object);
-        }
-      }
-    }
-    if (aggregateQueueSize.incrementAndGet() == 1) {
-      synchronized (ioRunnable) {
-        ioRunnable.notify();
-      }
-    }
-  }
+    Object object;
 
-  private final Runnable ioRunnable = new Runnable()
-  {
-    /**
-     * Due to memory model of java, last is almost like a thread
-     * local variable which we use to give each thread an affinity
-     * towards the send queue or the receive queue dynamically.
-     */
-    boolean last = System.currentTimeMillis() % 2 == 0;
+    Sender(Object object)
+    {
+      this.object = object;
+    }
 
     @Override
     public void run()
     {
-      try {
-        while (true) {
-          /* wait for an invitation until we have something to consume */
-          while (aggregateQueueSize.get() == 0) {
-            synchronized (ioRunnable) {
-              ioRunnable.wait();
-            }
-          }
-
-          /* if there is more than we can consume, call for help */
-          if (aggregateQueueSize.decrementAndGet() > 0) {
-            synchronized (ioRunnable) {
-              ioRunnable.notify();
-            }
-          }
-
-          DataStatePair pair;
-          Object object;
-
-          /*
-           * first check the queue where we found something last time,
-           * if there is nothing this time, remember it so that next time
-           * we will go to different queue.
-           *
-           */
-          if (last) {
-            synchronized (sendQueue) {
-              object = sendQueue.poll();
-            }
-            if (object == null) {
-              last = false;
-              synchronized (receiveQueue) {
-                pair = receiveQueue.poll();
-              }
-              synchronized (serdes) {
-                object = serdes.fromDataStatePair(pair);
-              }
-              onMessage((T)object);
-            }
-            else {
-              synchronized (serdes) {
-                pair = serdes.toDataStatePair(object);
-              }
-              writeObject(pair);
-            }
-          }
-          else {
-            synchronized (receiveQueue) {
-              pair = receiveQueue.poll();
-            }
-            if (pair == null) {
-              last = true;
-              synchronized (sendQueue) {
-                object = sendQueue.poll();
-              }
-              synchronized (serdes) {
-                pair = serdes.toDataStatePair(object);
-              }
-              writeObject(pair);
-            }
-            else {
-              synchronized (serdes) {
-                object = serdes.fromDataStatePair(pair);
-              }
-              onMessage((T)object);
-            }
-          }
-        }
+      DataStatePair pair;
+      synchronized (serdes) {
+        pair = serdes.toDataStatePair(object);
       }
-      catch (InterruptedException ex) {
-        synchronized (ioRunnable) {
-          if (threads != null) {
-            throw Throwables.throwFormatted(RuntimeException.class, "Interrupted while waiting for an IO workload!");
-          }
-        }
-      }
+      writeObject(pair);
     }
-  };
+  }
+
+  protected void send(final Object object)
+  {
+    executors.execute(new Sender(object));
+  }
 
   private synchronized void writeObject(DataStatePair pair)
   {
@@ -221,6 +110,26 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
 
     logger.trace("sending data = {}", pair.data);
     write(pair.data.buffer, pair.data.offset, pair.data.length);
+  }
+
+  class Receiver implements Runnable
+  {
+    DataStatePair pair;
+
+    Receiver(DataStatePair pair)
+    {
+      this.pair = pair;
+    }
+
+    @Override
+    public void run()
+    {
+      Object object;
+      synchronized (serdes) {
+        object = serdes.fromDataStatePair(pair);
+      }
+      onMessage((T)object);
+    }
   }
 
   @Override
@@ -238,23 +147,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
         state = null;
         pair.data = new Slice(buffer, offset, size);
         logger.trace("Identified data = {}", pair.data);
-        try {
-          receiveQueue.put(pair);
-        }
-        catch (InterruptedException ex) {
-          synchronized (ioRunnable) {
-            if (threads != null) {
-              throw Throwables.throwFormatted(ex, RuntimeException.class,
-                                              "Interrupted while processing received buffer {}!", pair);
-            }
-          }
-        }
-
-        if (aggregateQueueSize.incrementAndGet() == 1) {
-          synchronized (ioRunnable) {
-            ioRunnable.notify();
-          }
-        }
+        executors.execute(new Receiver(pair));
       }
     }
   }
