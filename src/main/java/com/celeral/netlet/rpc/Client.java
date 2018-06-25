@@ -16,23 +16,20 @@
 package com.celeral.netlet.rpc;
 
 import java.util.Arrays;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.celeral.netlet.AbstractLengthPrependerClient;
 import com.celeral.netlet.codec.DefaultStatefulStreamCodec;
-import com.celeral.netlet.codec.StatefulStreamCodec;
 import com.celeral.netlet.codec.StatefulStreamCodec.DataStatePair;
 import com.celeral.netlet.util.Slice;
-
-import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
-
-import java.util.concurrent.ExecutorService;
-
-import com.esotericsoftware.kryo.Serializer;
 
 /**
  *
@@ -43,56 +40,68 @@ import com.esotericsoftware.kryo.Serializer;
 public abstract class Client<T> extends AbstractLengthPrependerClient
 {
   Slice state;
-  private final DefaultStatefulStreamCodec<Object> privateSerdes;
-  protected final StatefulStreamCodec<Object> serdes;
-  protected final ExecutorService executors;
+  private final DefaultStatefulStreamCodec<Object> serdes;
+  private transient Executor executors;
 
-  Client()
+  private static class DirectExecutor implements Executor
   {
-    this(null);
+    @Override
+    public void execute(Runnable command)
+    {
+      command.run();
+    }
   }
 
-  public Client(ExecutorService executors)
+  private Client()
   {
-    privateSerdes = new DefaultStatefulStreamCodec<Object>();
+    this(new DirectExecutor());
+  }
 
-    /* setup the classes that we know about before hand */
-    privateSerdes.register(Ack.class);
-    privateSerdes.register(RPC.class);
-    privateSerdes.register(ExtendedRPC.class);
-    privateSerdes.register(RR.class);
-    this.serdes = executors == null ? privateSerdes : StatefulStreamCodec.Synchronized.wrap(privateSerdes);
+  public Client(Executor executors)
+  {
     this.executors = executors;
+
+    serdes = new DefaultStatefulStreamCodec<Object>();
+    /* setup the classes that we know about before hand */
+    serdes.register(Ack.class);
+    serdes.register(RPC.class);
+    serdes.register(ExtendedRPC.class);
+    serdes.register(RR.class);
   }
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {
-    privateSerdes.register(type, serializer);
+    serdes.register(type, serializer);
   }
 
   public abstract void onMessage(T message);
 
-  protected void send(final Object object)
+  class Sender implements Runnable
   {
-    if (executors == null) {
-      writeObject(serdes.toDataStatePair(object));
-    }
-    else {
-      executors.submit(new Runnable()
-      {
-        @Override
-        public void run()
-        {
-          synchronized (Client.this) {
-            writeObject(serdes.toDataStatePair(object));
-          }
-        }
+    Object object;
 
-      });
+    Sender(Object object)
+    {
+      this.object = object;
+    }
+
+    @Override
+    public void run()
+    {
+      DataStatePair pair;
+      synchronized (serdes) {
+        pair = serdes.toDataStatePair(object);
+      }
+      writeObject(pair);
     }
   }
 
-  private void writeObject(DataStatePair pair)
+  protected void send(final Object object)
+  {
+    executors.execute(new Sender(object));
+  }
+
+  private synchronized void writeObject(DataStatePair pair)
   {
     if (pair.state != null) {
       logger.trace("sending state = {}", pair.state);
@@ -101,6 +110,26 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
 
     logger.trace("sending data = {}", pair.data);
     write(pair.data.buffer, pair.data.offset, pair.data.length);
+  }
+
+  class Receiver implements Runnable
+  {
+    DataStatePair pair;
+
+    Receiver(DataStatePair pair)
+    {
+      this.pair = pair;
+    }
+
+    @Override
+    public void run()
+    {
+      Object object;
+      synchronized (serdes) {
+        object = serdes.fromDataStatePair(pair);
+      }
+      onMessage((T)object);
+    }
   }
 
   @Override
@@ -115,21 +144,10 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
       else {
         final DataStatePair pair = new DataStatePair();
         pair.state = state;
+        state = null;
         pair.data = new Slice(buffer, offset, size);
         logger.trace("Identified data = {}", pair.data);
-        if (executors == null) {
-          onMessage((T)serdes.fromDataStatePair(pair));
-        }
-        else {
-          executors.submit(new Runnable()
-          {
-            @Override
-            public void run()
-            {
-              onMessage((T)serdes.fromDataStatePair(pair));
-            }
-          });
-        }
+        executors.execute(new Receiver(pair));
       }
     }
   }
@@ -251,7 +269,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
     @Override
     public String toString()
     {
-      return "ExtendedRPC{" + "methodGenericstring=" + methodGenericstring + '}' + super.toString();
+      return "ExtendedRPC@" + System.identityHashCode(this) + '{' + "methodGenericstring=" + methodGenericstring + '}' + super.toString();
     }
 
   }

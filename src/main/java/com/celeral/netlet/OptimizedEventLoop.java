@@ -116,7 +116,7 @@ public class OptimizedEventLoop extends DefaultEventLoop
 
   }
 
-  @SuppressWarnings({"UseSpecificCatch"})
+  @SuppressWarnings({"UseSpecificCatch", "deprecation"})
   OptimizedEventLoop(String id, int taskBufferSize) throws IOException
   {
     super(id, taskBufferSize);

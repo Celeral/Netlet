@@ -1,4 +1,4 @@
-  /*
+/*
  * Copyright 2017 Celeral <netlet@celeral.com>.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,15 +21,18 @@ import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.celeral.netlet.AbstractServer;
 import com.celeral.netlet.DefaultEventLoop;
 import com.celeral.netlet.rpc.ConnectionAgent.SimpleConnectionAgent;
 import com.celeral.netlet.rpc.ProxyClient.ExecutingClient;
-import java.util.concurrent.Executors;
 
 import org.junit.Assert;
 import org.junit.Test;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +46,7 @@ public class RPCTest
   public static interface HelloWorld
   {
     void greet();
+
     boolean hasGreeted();
   }
 
@@ -70,18 +74,17 @@ public class RPCTest
 
   public static class Server extends AbstractServer
   {
-    private final boolean multithreaded;
-    public Server(boolean multithreaded)
+    private final Executor executor;
+
+    public Server(Executor executor)
     {
-      this.multithreaded = multithreaded;
+      this.executor = executor;
     }
 
     @Override
     public ClientListener getClientConnection(SocketChannel client, ServerSocketChannel server)
     {
-      return multithreaded
-             ? new ExecutingClient(new HelloWorldImpl(), new Class<?>[] {HelloWorld.class}, Executors.newFixedThreadPool(10))
-             : new ExecutingClient(new HelloWorldImpl(), new Class<?>[] {HelloWorld.class});
+      return new ExecutingClient(new HelloWorldImpl(), new Class<?>[]{HelloWorld.class}, executor);
     }
 
     @Override
@@ -95,25 +98,37 @@ public class RPCTest
 
   }
 
-
   @Test
   public void testRPCMultiThreaded() throws IOException, InterruptedException
   {
-    testRPC(true);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      testRPC(executor);
+    }
+    finally {
+      executor.shutdown();
+    }
   }
 
   @Test
   public void testRPCSingleThreaded() throws IOException, InterruptedException
   {
-    testRPC(false);
+    testRPC(new Executor()
+    {
+      @Override
+      public void execute(Runnable command)
+      {
+        command.run();
+      }
+    });
   }
 
-  public void testRPC(boolean multithreaded) throws IOException, InterruptedException
+  public void testRPC(Executor executor) throws IOException, InterruptedException
   {
     DefaultEventLoop el = DefaultEventLoop.createEventLoop("rpc");
     el.start();
     try {
-      Server server = new Server(multithreaded);
+      Server server = new Server(executor);
       el.start(new InetSocketAddress(0), server);
 
       SocketAddress si;
@@ -124,18 +139,25 @@ public class RPCTest
       }
 
       try {
-        ProxyClient client = new ProxyClient(new SimpleConnectionAgent((InetSocketAddress)si, el), TimeoutPolicy.NO_TIMEOUT_POLICY);
-        HelloWorld helloWorld = (HelloWorld)client.create(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
-        Assert.assertFalse("Before Greeted!", helloWorld.hasGreeted());
-
+        ProxyClient client = new ProxyClient(new SimpleConnectionAgent((InetSocketAddress)si, el),
+                                             TimeoutPolicy.NO_TIMEOUT_POLICY,
+                                             executor);
         try {
-          helloWorld.greet();
-        }
-        catch (RuntimeException ex) {
-          Assert.assertEquals("Hello World!", ex.getMessage());
-        }
+          HelloWorld helloWorld = (HelloWorld)client.create(HelloWorld.class.getClassLoader(), new Class<?>[]{HelloWorld.class});
+          Assert.assertFalse("Before Greeted!", helloWorld.hasGreeted());
 
-        Assert.assertTrue("After Greeted!", helloWorld.hasGreeted());
+          try {
+            helloWorld.greet();
+          }
+          catch (RuntimeException ex) {
+            Assert.assertEquals("Hello World!", ex.getMessage());
+          }
+
+          Assert.assertTrue("After Greeted!", helloWorld.hasGreeted());
+        }
+        finally {
+          client.close();
+        }
       }
       finally {
         el.stop(server);
