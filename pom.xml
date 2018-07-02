@@ -90,7 +90,7 @@
           <source>1.6</source>
           <target>1.6</target>
           <compilerArgs>
-            <arg>-Xlint:deprecation</arg>
+            <arg>-Xlint:all,-options,-path</arg>
           </compilerArgs>
         </configuration>
       </plugin>
