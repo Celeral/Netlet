@@ -61,7 +61,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
   {
     this.executors = executors;
 
-    serdes = new DefaultStatefulStreamCodec<Object>();
+    serdes = new DefaultStatefulStreamCodec<>();
     /* setup the classes that we know about before hand */
     serdes.register(Ack.class);
     serdes.register(RPC.class);
@@ -128,7 +128,10 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
       synchronized (serdes) {
         object = serdes.fromDataStatePair(pair);
       }
-      onMessage((T)object);
+
+      @SuppressWarnings("unchecked")
+      final T name = (T)object;
+      onMessage(name);
     }
   }
 

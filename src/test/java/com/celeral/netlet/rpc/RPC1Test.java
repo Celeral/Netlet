@@ -44,9 +44,8 @@ import com.celeral.netlet.util.Throwables;
  *
  * @author Chetan Narsude  <chetan@apache.org>
  */
-public class RPCTest
+public class RPC1Test
 {
-
   public static interface Hello
   {
     void greet();
@@ -85,7 +84,7 @@ public class RPCTest
   public static class Server extends AbstractServer
   {
     private final Executor executor;
-    static final MethodSerializer Generic_String_Based_Method_Serializer = new GenericStringBasedMethodSerializer(new Class<?>[]{Hello.class});
+    static final MethodSerializer<?> Generic_String_Based_Method_Serializer = new GenericStringBasedMethodSerializer(new Class<?>[]{Hello.class});
 
     public Server(Executor executor)
     {
@@ -95,7 +94,7 @@ public class RPCTest
     @Override
     public ClientListener getClientConnection(SocketChannel client, ServerSocketChannel server)
     {
-      return new ExecutingClient(new Bean<Identity>()
+      ExecutingClient executingClient = new ExecutingClient(new Bean<Identity>()
       {
         HelloImpl helloIndia = new HelloImpl("India");
         HelloImpl helloWorld = new HelloImpl("World");
@@ -110,6 +109,7 @@ public class RPCTest
           return helloWorld;
         }
       }, ExternalizableMethodSerializer.SINGLETON, executor);
+      return executingClient;
     }
 
     @Override
@@ -120,7 +120,6 @@ public class RPCTest
         notify();
       }
     }
-
   }
 
   @Test

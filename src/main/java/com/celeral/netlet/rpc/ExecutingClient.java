@@ -34,13 +34,14 @@ public class ExecutingClient extends Client<Client.RPC>
   private final ConcurrentHashMap<Integer, Integer> notifyMap;
   private final MethodSerializer<Object> methodSerializer;
 
-  public ExecutingClient(Bean<?> bean, MethodSerializer<Object> methodSerializer, Executor executor)
+  @SuppressWarnings("unchecked")
+  public ExecutingClient(Bean<?> bean, MethodSerializer<?> methodSerializer, Executor executor)
   {
     super(executor);
     this.bean = (Bean<Object>)bean;
-    this.methodSerializer = methodSerializer;
-    this.methodMap = new ConcurrentHashMap<Integer, Method>();
-    this.notifyMap = new ConcurrentHashMap<Integer, Integer>();
+    this.methodSerializer = (MethodSerializer<Object>)methodSerializer;
+    this.methodMap = new ConcurrentHashMap<>();
+    this.notifyMap = new ConcurrentHashMap<>();
   }
 
   public ExecutingClient(Bean<?> bean, Executor executor)

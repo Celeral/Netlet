@@ -65,7 +65,7 @@ public class ProxyClient
     public RPCFuture(RPC rpc, RR rr)
     {
       this.rpc = rpc;
-      this.rr = new AtomicReference<RR>(rr);
+      this.rr = new AtomicReference<>(rr);
     }
 
     public RPCFuture(RPC rpc)
@@ -134,6 +134,7 @@ public class ProxyClient
 
   }
 
+  @SuppressWarnings("unchecked")
   public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy, MethodSerializer<?> methodSerializer, Executor executors)
   {
     this.policy = policy;
@@ -142,6 +143,7 @@ public class ProxyClient
     this.executors = executors;
   }
 
+  @SuppressWarnings("unchecked")
   public <T> T create(Object identifier, ClassLoader loader, Class<?>[] interfaces)
   {
     // we can pass the interfaces to the InvocationHandlerImpl, and it can make sure that all the interfaces are supported
@@ -159,10 +161,10 @@ public class ProxyClient
     final ConcurrentLinkedQueue<RPCFuture> futureResponses;
     DelegatingClient client;
 
-    public InvocationHandlerImpl(Object id)
+    InvocationHandlerImpl(Object id)
     {
       identity = id;
-      futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
+      futureResponses = new ConcurrentLinkedQueue<>();
     }
 
     @Override
@@ -209,7 +211,7 @@ public class ProxyClient
 
   }
 
-  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap<Class<?>, Serializer<?>>();
+  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap<>();
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {

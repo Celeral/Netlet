@@ -156,7 +156,7 @@ public class DefaultStatefulStreamCodec<T> extends Kryo implements StatefulStrea
       method.invoke(null, Arrays.copyOfRange(dspair.data.buffer, dspair.data.offset, dspair.data.offset + dspair.data.length), f);
     }
     catch (Exception ex1) {
-      logger.info("Cascading issue while writing debugging data to address original exception", ex1);
+      ex.addSuppressed(ex1);
     }
 
     throw Throwables.wrapIfChecked(ex);

@@ -33,7 +33,7 @@ import com.celeral.netlet.util.Throwables;
  */
 public class ExternalizableMethodSerializer implements MethodSerializer<ExternalizableMethodSerializer.ExternalizableMethod>
 {
-  public static final MethodSerializer SINGLETON = new ExternalizableMethodSerializer();
+    public static final MethodSerializer<ExternalizableMethodSerializer.ExternalizableMethod> SINGLETON = new ExternalizableMethodSerializer();
 
   @Override
   public ExternalizableMethod toSerializable(Method method)
