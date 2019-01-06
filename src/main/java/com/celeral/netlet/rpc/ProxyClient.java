@@ -16,22 +16,21 @@
 package com.celeral.netlet.rpc;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.esotericsoftware.kryo.Serializer;
@@ -42,32 +41,18 @@ import org.slf4j.LoggerFactory;
 import com.celeral.netlet.rpc.Client.ExtendedRPC;
 import com.celeral.netlet.rpc.Client.RPC;
 import com.celeral.netlet.rpc.Client.RR;
-import com.celeral.netlet.util.Throwables;
 
 /**
  * The class is abstract so that we can resolve the type T at runtime.
  *
  * @author Chetan Narsude {@literal <chetan@apache.org>}
  */
-public class ProxyClient implements InvocationHandler, Closeable
+public class ProxyClient
 {
-  private TimeoutPolicy policy;
-  private ConnectionAgent agent;
-  DelegatingClient client;
-
-  ConcurrentLinkedQueue<RPCFuture> futureResponses;
-  private Executor executors;
-
-  @Override
-  public void close() throws IOException
-  {
-    if (client != null) {
-      if (client.isConnected()) {
-        agent.disconnect(client);
-      }
-      client = null;
-    }
-  }
+  private final TimeoutPolicy policy;
+  private final ConnectionAgent agent;
+  private final Executor executors;
+  private final MethodSerializer<Object> methodSerializer;
 
   /**
    * Future for tracking the asynchronous responses to the RPC call.
@@ -80,7 +65,7 @@ public class ProxyClient implements InvocationHandler, Closeable
     public RPCFuture(RPC rpc, RR rr)
     {
       this.rpc = rpc;
-      this.rr = new AtomicReference<RR>(rr);
+      this.rr = new AtomicReference<>(rr);
     }
 
     public RPCFuture(RPC rpc)
@@ -149,96 +134,110 @@ public class ProxyClient implements InvocationHandler, Closeable
 
   }
 
-  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy, Executor executors)
+  @SuppressWarnings("unchecked")
+  public ProxyClient(ConnectionAgent agent, TimeoutPolicy policy, MethodSerializer<?> methodSerializer, Executor executors)
   {
-    this.futureResponses = new ConcurrentLinkedQueue<RPCFuture>();
     this.policy = policy;
+    this.methodSerializer = (MethodSerializer<Object>)methodSerializer;
     this.agent = agent;
     this.executors = executors;
   }
 
-  public Object create(ClassLoader loader, Class<?>[] interfaces)
+  @SuppressWarnings("unchecked")
+  public <T> T create(Object identifier, ClassLoader loader, Class<?>[] interfaces)
   {
-    // is there a value in making sure that the passed interfaces contain the type T
-//    TypeVariable<? extends Class<?>>[] typeParameters = ProxyClient.class.getTypeParameters();
-//    if (typeParameters != null) {
-//      boolean typefound = false;
-//      typeloop:
-//      for (TypeVariable<? extends Class<?>> parameter: typeParameters) {
-//        for (Class<?> iface: interfaces) {
-//          if (iface.equals(parameter.getGenericDeclaration())) {
-//            typefound = true;
-//            break typeloop;
-//          }
-//        }
-//      }
-//
-//      if (!typefound) {
-//        logger.error("interface mismatch generics = {} and interfaces = {}", typeParameters, interfaces);
-//        throw new IllegalArgumentException("// Interface mismatch - refer to the debug statements");
-//      }
-//    }
-
-    return Proxy.newProxyInstance(loader, interfaces, this);
+    // we can pass the interfaces to the InvocationHandlerImpl, and it can make sure that all the interfaces are supported
+    return (T)Proxy.newProxyInstance(loader, interfaces, new InvocationHandlerImpl(identifier));
   }
 
-  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap();
+  public <T> T create(Object identifier, Class<T> iface)
+  {
+    return create(identifier, Thread.currentThread().getContextClassLoader(), new Class<?>[]{iface});
+  }
+
+  private class InvocationHandlerImpl implements InvocationHandler, Closeable
+  {
+    final Object identity;
+    final ConcurrentLinkedQueue<RPCFuture> futureResponses;
+    DelegatingClient client;
+
+    InvocationHandlerImpl(Object id)
+    {
+      identity = id;
+      futureResponses = new ConcurrentLinkedQueue<>();
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
+    {
+      do {
+        if (client == null) {
+          client = new DelegatingClient(futureResponses, methodSerializer, executors);
+          for (Map.Entry<Class<?>, Serializer<?>> entry : serializers.entrySet()) {
+            client.addDefaultSerializer(entry.getKey(), entry.getValue());
+          }
+          agent.connect(client);
+        }
+        else if (!client.isConnected()) {
+          agent.connect(client);
+        }
+
+        RPCFuture future = new RPCFuture(client.send(identity, method, args));
+        futureResponses.add(future);
+
+        try {
+          return future.get(policy.getTimeoutMillis(), TimeUnit.MILLISECONDS);
+        }
+        catch (TimeoutException ex) {
+          policy.handleTimeout(ProxyClient.this, ex);
+        }
+        catch (ExecutionException ex) {
+          throw ex.getCause();
+        }
+      }
+      while (true);
+    }
+
+    @Override
+    public void close()
+    {
+      if (client != null) {
+        if (client.isConnected()) {
+          agent.disconnect(client);
+        }
+        client = null;
+      }
+    }
+
+  }
+
+  private LinkedHashMap<Class<?>, Serializer<?>> serializers = new LinkedHashMap<>();
 
   public void addDefaultSerializer(Class<?> type, Serializer<?> serializer)
   {
     serializers.put(type, serializer);
   }
 
-  // whenenver method on the proxy instance is called, this method gets called.
-  // it's imperial that we are able to serialize all this information and send
-  // it over the pipe!
-  @Override
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
-  {
-    do {
-      if (client == null) {
-        client = new DelegatingClient(futureResponses, executors);
-        for (Map.Entry<Class<?>, Serializer<?>> entry : serializers.entrySet()) {
-          client.addDefaultSerializer(entry.getKey(), entry.getValue());
-        }
-        agent.connect(client);
-      }
-      else if (!client.isConnected()) {
-        agent.connect(client);
-      }
-
-      RPCFuture future = new RPCFuture(client.send(method, args));
-      futureResponses.add(future);
-
-      try {
-        return future.get(getPolicy().getTimeoutMillis(), TimeUnit.MILLISECONDS);
-      }
-      catch (TimeoutException ex) {
-        getPolicy().handleTimeout(this, ex);
-      }
-      catch (ExecutionException ex) {
-        throw ex.getCause();
-      }
-    }
-    while (true);
-  }
-
   public static class DelegatingClient extends Client<RR>
   {
-    HashMap<Method, Integer> methodMap;
-    private final ConcurrentLinkedQueue<RPCFuture> futureResponses;
+    Map<Method, Integer> methodMap;
+    Map<Object, Integer> identityMap;
 
-    DelegatingClient(ConcurrentLinkedQueue<RPCFuture> futureResponses, Executor executors)
+    private final ConcurrentLinkedQueue<RPCFuture> futureResponses;
+    private final MethodSerializer<Object> methodSerializer;
+
+    DelegatingClient(ConcurrentLinkedQueue<RPCFuture> futureResponses, MethodSerializer<Object> methodSerializer, Executor executors)
     {
       super(executors);
       this.futureResponses = futureResponses;
-      methodMap = new HashMap<Method, Integer>();
+      this.methodSerializer = methodSerializer;
+      methodMap = Collections.synchronizedMap(new WeakHashMap<Method, Integer>());
+      identityMap = Collections.synchronizedMap(new WeakHashMap<Object, Integer>());
     }
 
     @Override
     public void onMessage(RR rr)
     {
-      logger.trace("rr = {}", rr);
       Iterator<RPCFuture> iterator = futureResponses.iterator();
       while (iterator.hasNext()) {
         RPCFuture next = iterator.next();
@@ -254,129 +253,26 @@ public class ProxyClient implements InvocationHandler, Closeable
       }
     }
 
-    public RPC send(Method method, Object[] args)
+    static final AtomicInteger methodIdGenerator = new AtomicInteger();
+
+    public RPC send(Object identifier, Method method, Object[] args)
     {
       RPC rpc;
+
       Integer i = methodMap.get(method);
       if (i == null) {
-        int id = methodMap.size() + 1;
+        int id = methodIdGenerator.incrementAndGet();
         methodMap.put(method, id);
-        rpc = new ExtendedRPC(method.toGenericString(), id, args);
+        rpc = new ExtendedRPC(methodSerializer.toSerializable(method), id, identifier, args);
       }
       else {
-        rpc = new RPC(i, args);
+        rpc = new RPC(i, identifier, args);
       }
-
-      logger.trace("sending rpc = {}", rpc);
 
       send(rpc);
       return rpc;
     }
 
-  }
-
-  public static class ExecutingClient extends Client<RPC>
-  {
-    ConcurrentHashMap<Integer, Method> methodMap;
-    public final Object executor;
-    private final Class<?>[] interfaces;
-
-    public ExecutingClient(Object executor, Class<?>[] interfaces, Executor executors)
-    {
-      super(executors);
-      this.executor = executor;
-      this.interfaces = interfaces;
-      this.methodMap = new ConcurrentHashMap<Integer, Method>();
-    }
-
-    @Override
-    @SuppressWarnings("UseSpecificCatch")
-    public void onMessage(RPC message)
-    {
-      RR rr;
-
-      try {
-        Method method;
-        if (message instanceof ExtendedRPC) {
-          method = null;
-
-          /* go for a linear search */
-          String methodGenericstring = ((ExtendedRPC)message).methodGenericstring;
-
-          for (Class<?> intf : interfaces) {
-            for (Method m : intf.getMethods()) {
-              logger.trace("genericString = {}", m.toGenericString());
-              if (methodGenericstring.equals(m.toGenericString())) {
-                methodMap.put(message.methodId, m);
-                method = m;
-                break;
-              }
-            }
-          }
-
-          if (method == null) {
-            throw new NoSuchMethodException("Missing method for " + message);
-          }
-        }
-        else {
-          method = methodMap.get(message.methodId);
-
-          if (method == null) {
-            throw new IllegalStateException("Missing mapping for " + message);
-          }
-        }
-
-        rr = new RR(message.id, method.invoke(executor, message.args));
-      }
-      catch (InvocationTargetException ex) {
-        rr = new RR(message.id, null, ex.getCause());
-      }
-      catch (Exception ex) {
-        rr = new RR(message.id, null, ex);
-      }
-
-      send(rr);
-    }
-
-  }
-
-  /**
-   * @return the agent
-   */
-  public ConnectionAgent getConnectionAgent()
-  {
-    return agent;
-  }
-
-  /**
-   * @param agent the agent to set
-   */
-  public void setConnectionAgent(ConnectionAgent agent)
-  {
-    try {
-      close();
-    }
-    catch (IOException ex) {
-      throw Throwables.throwFormatted(ex, RuntimeException.class,
-                                      "Unable to set connection agent {}!", agent);
-    }
-    this.agent = agent;
-  }
-
-  /**
-   * @return the policy
-   */
-  public TimeoutPolicy getPolicy()
-  {
-    return policy;
-  }
-
-  /**
-   * @param policy the policy to set
-   */
-  public void setPolicy(TimeoutPolicy policy)
-  {
-    this.policy = policy;
   }
 
   private static final Logger logger = LoggerFactory.getLogger(ProxyClient.class);

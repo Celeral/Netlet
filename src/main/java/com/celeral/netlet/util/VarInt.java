@@ -16,7 +16,8 @@
 package com.celeral.netlet.util;
 
 /**
- * <p>VarInt class.</p>
+ * <p>
+ * VarInt class.</p>
  *
  * @since 1.0.0
  */
@@ -28,6 +29,7 @@ public class VarInt
    * @param value
    * @param buffer
    * @param offset
+   *
    * @return int
    */
   public static int write(int value, byte[] buffer, int offset)
@@ -75,15 +77,25 @@ public class VarInt
 
   public static class MutableInt
   {
+    public MutableInt(int integer)
+    {
+      this.integer = integer;
+    }
+
+    public MutableInt()
+    {
+    }
+
     public int integer;
   }
 
   /**
    *
    * @param readBuffer The array of bytes which contains the data to be parsed.
-   * @param offset The offset where we should start reading the first 7 bits of varint.
-   * @param limit The length of the slice of the data array where in which we are reading varint.
-   * @param newOffset If the varint is read successfully, newOffset contains the position after varint.
+   * @param offset     The offset where we should start reading the first 7 bits of varint.
+   * @param limit      The length of the slice of the data array where in which we are reading varint.
+   * @param newOffset  If the varint is read successfully, newOffset contains the position after varint.
+   *
    * @return varint value read
    */
   public static int read(byte[] readBuffer, int offset, int limit, MutableInt newOffset)

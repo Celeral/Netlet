@@ -61,7 +61,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
   {
     this.executors = executors;
 
-    serdes = new DefaultStatefulStreamCodec<Object>();
+    serdes = new DefaultStatefulStreamCodec<>();
     /* setup the classes that we know about before hand */
     serdes.register(Ack.class);
     serdes.register(RPC.class);
@@ -128,7 +128,10 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
       synchronized (serdes) {
         object = serdes.fromDataStatePair(pair);
       }
-      onMessage((T)object);
+
+      @SuppressWarnings("unchecked")
+      final T name = (T)object;
+      onMessage(name);
     }
   }
 
@@ -215,6 +218,7 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
   public static class RPC extends Ack
   {
     int methodId;
+    Object identifier;
     Object[] args;
 
     protected RPC()
@@ -222,22 +226,23 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
       /* for serialization */
     }
 
-    public RPC(int methodId, Object[] args)
+    public RPC(int methodId, Object identifier, Object[] args)
     {
-      this(counter.incrementAndGet(), methodId, args);
+      this(counter.incrementAndGet(), methodId, identifier, args);
     }
 
-    public RPC(int id, int methodId, Object[] args)
+    public RPC(int id, int methodId, Object identifier, Object[] args)
     {
       super(id);
       this.methodId = methodId;
+      this.identifier = identifier;
       this.args = args;
     }
 
     @Override
     public String toString()
     {
-      return "RPC{" + "methodId=" + methodId + ", args=" + Arrays.toString(args) + '}' + super.toString();
+      return "RPC{" + "methodId=" + methodId + ", identifier=" + identifier.toString() + ", args=" + Arrays.toString(args) + '}' + super.toString();
     }
 
   }
@@ -248,28 +253,28 @@ public abstract class Client<T> extends AbstractLengthPrependerClient
    */
   public static class ExtendedRPC extends RPC
   {
-    public String methodGenericstring;
+    public Object serializableMethod;
 
     protected ExtendedRPC()
     {
       /* for serialization */
     }
 
-    public ExtendedRPC(int id, String genericString, int methodId, Object[] args)
+    public ExtendedRPC(int id, Object method, int methodId, Object identifier, Object[] args)
     {
-      super(id, methodId, args);
-      methodGenericstring = genericString;
+      super(id, methodId, identifier, args);
+      serializableMethod = method;
     }
 
-    public ExtendedRPC(String genericString, int methodId, Object[] args)
+    public ExtendedRPC(Object method, int methodId, Object identifier, Object[] args)
     {
-      this(counter.incrementAndGet(), genericString, methodId, args);
+      this(counter.incrementAndGet(), method, methodId, identifier, args);
     }
 
     @Override
     public String toString()
     {
-      return "ExtendedRPC@" + System.identityHashCode(this) + '{' + "methodGenericstring=" + methodGenericstring + '}' + super.toString();
+      return "ExtendedRPC@" + System.identityHashCode(this) + '{' + "methodGenericstring=" + serializableMethod + '}' + super.toString();
     }
 
   }
